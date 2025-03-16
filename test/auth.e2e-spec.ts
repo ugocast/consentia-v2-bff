@@ -14,10 +14,12 @@ describe('AuthController (e2e)', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    
+
     // Configurar el mock para devolver el cliente de Supabase
-    (supabaseConfig.createSupabaseClient as jest.Mock).mockReturnValue(mockSupabaseClient);
-    
+    (supabaseConfig.createSupabaseClient as jest.Mock).mockReturnValue(
+      mockSupabaseClient,
+    );
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -39,12 +41,12 @@ describe('AuthController (e2e)', () => {
         email: registerDto.email,
         user_metadata: { name: registerDto.name },
       };
-      
+
       const mockSession = {
         access_token: 'access-token',
         refresh_token: 'refresh-token',
       };
-      
+
       mockSupabaseClient.auth.signUp.mockResolvedValue({
         data: {
           user: mockUser,
@@ -78,12 +80,12 @@ describe('AuthController (e2e)', () => {
         email: loginDto.email,
         user_metadata: { name: 'Test User' },
       };
-      
+
       const mockSession = {
         access_token: 'access-token',
         refresh_token: 'refresh-token',
       };
-      
+
       mockSupabaseClient.auth.signInWithPassword.mockResolvedValue({
         data: {
           user: mockUser,
@@ -107,4 +109,4 @@ describe('AuthController (e2e)', () => {
   afterAll(async () => {
     await app.close();
   });
-}); 
+});

@@ -1,6 +1,10 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { createSupabaseClient } from '../config/supabase.config';
-import { AuditService, AuditAction, ResourceType } from '../common/audit/audit.service';
+import {
+  AuditService,
+  AuditAction,
+  ResourceType,
+} from '../common/audit/audit.service';
 import { CreatePolicyDto, UpdatePolicyDto, PolicyDto } from './dto';
 
 @Injectable()
@@ -19,18 +23,21 @@ export class PoliciesService {
         .from('legal_policy')
         .select('*')
         .is('valid_to', null);
-      
+
       if (companyId) {
         query = query.eq('company_id', companyId);
       }
-      
+
       const { data, error } = await query;
-      
+
       if (error) {
-        this.logger.error(`Error al obtener políticas: ${error.message}`, error);
+        this.logger.error(
+          `Error al obtener políticas: ${error.message}`,
+          error,
+        );
         throw new Error(`Error al obtener políticas: ${error.message}`);
       }
-      
+
       return data as PolicyDto[];
     } catch (error) {
       this.logger.error('Error al obtener políticas', error);
@@ -41,7 +48,10 @@ export class PoliciesService {
   /**
    * Crea una nueva política
    */
-  async create(createPolicyDto: CreatePolicyDto, userId: string): Promise<PolicyDto> {
+  async create(
+    createPolicyDto: CreatePolicyDto,
+    userId: string,
+  ): Promise<PolicyDto> {
     try {
       const { data, error } = await this.supabase
         .from('legal_policy')
@@ -54,12 +64,12 @@ export class PoliciesService {
         })
         .select()
         .single();
-      
+
       if (error) {
         this.logger.error(`Error al crear política: ${error.message}`, error);
         throw new Error(`Error al crear política: ${error.message}`);
       }
-      
+
       // Registrar la acción en el log de auditoría
       await this.auditService.log({
         action: AuditAction.CREATE_POLICY,
@@ -71,7 +81,7 @@ export class PoliciesService {
           companyId: createPolicyDto.companyId,
         },
       });
-      
+
       return data as PolicyDto;
     } catch (error) {
       this.logger.error('Error al crear política', error);
@@ -89,12 +99,12 @@ export class PoliciesService {
         .select('*')
         .eq('id', id)
         .single();
-      
+
       if (error || !data) {
         this.logger.error(`Política no encontrada: ${error?.message}`);
         throw new NotFoundException('Política no encontrada');
       }
-      
+
       return data as PolicyDto;
     } catch (error) {
       this.logger.error(`Error al obtener política: ${error.message}`, error);
@@ -105,7 +115,11 @@ export class PoliciesService {
   /**
    * Actualiza una política (crea una nueva versión)
    */
-  async update(id: string, updatePolicyDto: UpdatePolicyDto, userId: string): Promise<PolicyDto> {
+  async update(
+    id: string,
+    updatePolicyDto: UpdatePolicyDto,
+    userId: string,
+  ): Promise<PolicyDto> {
     try {
       // Obtener la política actual
       const { data: currentPolicy, error: fetchError } = await this.supabase
@@ -113,12 +127,12 @@ export class PoliciesService {
         .select('*')
         .eq('id', id)
         .single();
-      
+
       if (fetchError || !currentPolicy) {
         this.logger.error(`Política no encontrada: ${fetchError?.message}`);
         throw new NotFoundException('Política no encontrada');
       }
-      
+
       // Crear una nueva versión de la política
       const { data: newPolicy, error: insertError } = await this.supabase
         .from('legal_policy')
@@ -132,22 +146,28 @@ export class PoliciesService {
         })
         .select()
         .single();
-      
+
       if (insertError) {
-        this.logger.error(`Error al crear nueva versión de la política: ${insertError.message}`, insertError);
+        this.logger.error(
+          `Error al crear nueva versión de la política: ${insertError.message}`,
+          insertError,
+        );
         throw new Error('Error al crear nueva versión de la política');
       }
-      
+
       // Actualizar la fecha de validez de la versión anterior
       const { error: updateError } = await this.supabase
         .from('legal_policy')
         .update({ valid_to: new Date().toISOString() })
         .eq('id', id);
-      
+
       if (updateError) {
-        this.logger.error(`Error al actualizar versión anterior: ${updateError.message}`, updateError);
+        this.logger.error(
+          `Error al actualizar versión anterior: ${updateError.message}`,
+          updateError,
+        );
       }
-      
+
       // Registrar la acción en el log de auditoría
       await this.auditService.log({
         action: AuditAction.UPDATE_POLICY,
@@ -160,10 +180,13 @@ export class PoliciesService {
           companyId: currentPolicy.company_id,
         },
       });
-      
+
       return newPolicy as PolicyDto;
     } catch (error) {
-      this.logger.error(`Error al actualizar política: ${error.message}`, error);
+      this.logger.error(
+        `Error al actualizar política: ${error.message}`,
+        error,
+      );
       throw error;
     }
   }
@@ -179,24 +202,27 @@ export class PoliciesService {
         .select('*')
         .eq('id', id)
         .single();
-      
+
       if (fetchError || !currentPolicy) {
         this.logger.error(`Política no encontrada: ${fetchError?.message}`);
         throw new NotFoundException('Política no encontrada');
       }
-      
+
       // Obtener todas las versiones relacionadas
       const { data, error } = await this.supabase
         .from('legal_policy')
         .select('*')
         .or(`id.eq.${id},previous_version_id.eq.${id}`)
         .order('valid_from', { ascending: false });
-      
+
       if (error) {
-        this.logger.error(`Error al obtener versiones: ${error.message}`, error);
+        this.logger.error(
+          `Error al obtener versiones: ${error.message}`,
+          error,
+        );
         throw new Error(`Error al obtener versiones: ${error.message}`);
       }
-      
+
       return data as PolicyDto[];
     } catch (error) {
       this.logger.error(`Error al obtener versiones: ${error.message}`, error);
@@ -215,23 +241,26 @@ export class PoliciesService {
         .select('*')
         .eq('id', id)
         .single();
-      
+
       if (fetchError || !currentPolicy) {
         this.logger.error(`Política no encontrada: ${fetchError?.message}`);
         throw new NotFoundException('Política no encontrada');
       }
-      
+
       // Actualizar la fecha de validez para hacer un soft delete
       const { error: updateError } = await this.supabase
         .from('legal_policy')
         .update({ valid_to: new Date().toISOString() })
         .eq('id', id);
-      
+
       if (updateError) {
-        this.logger.error(`Error al eliminar política: ${updateError.message}`, updateError);
+        this.logger.error(
+          `Error al eliminar política: ${updateError.message}`,
+          updateError,
+        );
         throw new Error(`Error al eliminar política: ${updateError.message}`);
       }
-      
+
       // Registrar la acción en el log de auditoría
       await this.auditService.log({
         action: AuditAction.DELETE_POLICY,

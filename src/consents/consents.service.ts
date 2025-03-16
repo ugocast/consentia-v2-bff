@@ -1,6 +1,15 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { createSupabaseClient } from '../config/supabase.config';
-import { AuditService, AuditAction, ResourceType } from '../common/audit/audit.service';
+import {
+  AuditService,
+  AuditAction,
+  ResourceType,
+} from '../common/audit/audit.service';
 import {
   CreateConsentRequestDto,
   RespondConsentRequestDto,
@@ -20,6 +29,11 @@ export class ConsentsService {
 
   /**
    * Obtiene todos los consentimientos con filtros opcionales
+   * @param companyId - ID de la compañía para filtrar consentimientos (opcional)
+   * @param dataSubjectId - ID del titular de los datos para filtrar consentimientos (opcional)
+   * @param status - Estado para filtrar consentimientos (opcional)
+   * @returns Lista de consentimientos que cumplen con los criterios de filtrado
+   * @throws Error si hay un problema al obtener los consentimientos
    */
   async findAll(
     companyId?: string,
@@ -49,14 +63,18 @@ export class ConsentsService {
       const { data, error } = await query;
 
       if (error) {
-        this.logger.error(`Error al obtener consentimientos: ${error.message}`, error);
+        this.logger.error(
+          `Error al obtener consentimientos: ${error.message}`,
+          error,
+        );
         throw new Error(`Error al obtener consentimientos: ${error.message}`);
       }
 
       // Si filtramos por compañía, necesitamos limpiar los datos para devolver solo los consentimientos
       if (companyId) {
         return data.map((item) => {
-          const { legal_policy, ...consent } = item;
+          // Extraemos la política legal pero no la necesitamos en la respuesta
+          const { legal_policy: _legalPolicy, ...consent } = item;
           return consent as ConsentDto;
         });
       }
@@ -70,13 +88,18 @@ export class ConsentsService {
 
   /**
    * Obtiene un consentimiento por su ID con detalles adicionales
+   * @param id - ID único del consentimiento a buscar
+   * @returns Consentimiento con detalles adicionales como política legal y tipos de datos
+   * @throws NotFoundException si el consentimiento no existe
+   * @throws Error si hay un problema al obtener el consentimiento
    */
   async findOne(id: string): Promise<ConsentWithDetailsDto> {
     try {
       // Obtener el consentimiento con la política legal y los tipos de datos
       const { data, error } = await this.supabase
         .from('consent')
-        .select(`
+        .select(
+          `
           *,
           legal_policy (*),
           data_subject:data_subject_id (*),
@@ -84,7 +107,8 @@ export class ConsentsService {
             data_type_id,
             data_type:data_type_id (*)
           )
-        `)
+        `,
+        )
         .eq('id', id)
         .single();
 
@@ -106,13 +130,23 @@ export class ConsentsService {
         data_types: dataTypes,
       } as ConsentWithDetailsDto;
     } catch (error) {
-      this.logger.error(`Error al obtener consentimiento: ${error.message}`, error);
+      this.logger.error(
+        `Error al obtener consentimiento: ${error.message}`,
+        error,
+      );
       throw error;
     }
   }
 
   /**
    * Actualiza el estado de un consentimiento
+   * @param id - ID único del consentimiento a actualizar
+   * @param updateStatusDto - DTO con el nuevo estado y metadatos adicionales
+   * @param userId - ID del usuario que realiza la actualización
+   * @returns Consentimiento actualizado con el nuevo estado
+   * @throws NotFoundException si el consentimiento no existe
+   * @throws BadRequestException si la transición de estado no es válida
+   * @throws Error si hay un problema al actualizar el consentimiento
    */
   async updateStatus(
     id: string,
@@ -128,12 +162,17 @@ export class ConsentsService {
         .single();
 
       if (fetchError || !currentConsent) {
-        this.logger.error(`Consentimiento no encontrado: ${fetchError?.message}`);
+        this.logger.error(
+          `Consentimiento no encontrado: ${fetchError?.message}`,
+        );
         throw new NotFoundException('Consentimiento no encontrado');
       }
 
       // Validar la transición de estado
-      this.validateStatusTransition(currentConsent.status, updateStatusDto.status);
+      this.validateStatusTransition(
+        currentConsent.status,
+        updateStatusDto.status,
+      );
 
       // Actualizar el estado del consentimiento
       const { data: updatedConsent, error: updateError } = await this.supabase
@@ -152,7 +191,10 @@ export class ConsentsService {
         .single();
 
       if (updateError) {
-        this.logger.error(`Error al actualizar estado: ${updateError.message}`, updateError);
+        this.logger.error(
+          `Error al actualizar estado: ${updateError.message}`,
+          updateError,
+        );
         throw new Error(`Error al actualizar estado: ${updateError.message}`);
       }
 
@@ -178,6 +220,12 @@ export class ConsentsService {
 
   /**
    * Crea una nueva solicitud de consentimiento
+   * @param createRequestDto - DTO con los datos para crear la solicitud de consentimiento
+   * @param userId - ID del usuario que crea la solicitud
+   * @returns Solicitud de consentimiento creada
+   * @throws NotFoundException si la política legal no existe
+   * @throws BadRequestException si alguno de los tipos de datos no existe
+   * @throws Error si hay un problema al crear la solicitud
    */
   async createRequest(
     createRequestDto: CreateConsentRequestDto,
@@ -192,7 +240,9 @@ export class ConsentsService {
         .single();
 
       if (policyError || !policy) {
-        this.logger.error(`Política legal no encontrada: ${policyError?.message}`);
+        this.logger.error(
+          `Política legal no encontrada: ${policyError?.message}`,
+        );
         throw new NotFoundException('Política legal no encontrada');
       }
 
@@ -203,8 +253,13 @@ export class ConsentsService {
         .in('id', createRequestDto.dataTypeIds);
 
       if (dataTypesError) {
-        this.logger.error(`Error al verificar tipos de datos: ${dataTypesError.message}`, dataTypesError);
-        throw new Error(`Error al verificar tipos de datos: ${dataTypesError.message}`);
+        this.logger.error(
+          `Error al verificar tipos de datos: ${dataTypesError.message}`,
+          dataTypesError,
+        );
+        throw new Error(
+          `Error al verificar tipos de datos: ${dataTypesError.message}`,
+        );
       }
 
       if (dataTypes.length !== createRequestDto.dataTypeIds.length) {
@@ -214,33 +269,45 @@ export class ConsentsService {
 
       // Buscar o crear el titular de los datos
       let dataSubjectId: string;
-      const { data: existingDataSubject, error: dataSubjectError } = await this.supabase
-        .from('data_subject')
-        .select('id')
-        .eq('email', createRequestDto.dataSubjectEmail)
-        .maybeSingle();
+      const { data: existingDataSubject, error: dataSubjectError } =
+        await this.supabase
+          .from('data_subject')
+          .select('id')
+          .eq('email', createRequestDto.dataSubjectEmail)
+          .maybeSingle();
 
       if (dataSubjectError) {
-        this.logger.error(`Error al buscar titular de datos: ${dataSubjectError.message}`, dataSubjectError);
-        throw new Error(`Error al buscar titular de datos: ${dataSubjectError.message}`);
+        this.logger.error(
+          `Error al buscar titular de datos: ${dataSubjectError.message}`,
+          dataSubjectError,
+        );
+        throw new Error(
+          `Error al buscar titular de datos: ${dataSubjectError.message}`,
+        );
       }
 
       if (existingDataSubject) {
         dataSubjectId = existingDataSubject.id;
       } else {
         // Crear nuevo titular de datos
-        const { data: newDataSubject, error: createDataSubjectError } = await this.supabase
-          .from('data_subject')
-          .insert({
-            email: createRequestDto.dataSubjectEmail,
-            name: createRequestDto.dataSubjectName,
-          })
-          .select()
-          .single();
+        const { data: newDataSubject, error: createDataSubjectError } =
+          await this.supabase
+            .from('data_subject')
+            .insert({
+              email: createRequestDto.dataSubjectEmail,
+              name: createRequestDto.dataSubjectName,
+            })
+            .select()
+            .single();
 
         if (createDataSubjectError) {
-          this.logger.error(`Error al crear titular de datos: ${createDataSubjectError.message}`, createDataSubjectError);
-          throw new Error(`Error al crear titular de datos: ${createDataSubjectError.message}`);
+          this.logger.error(
+            `Error al crear titular de datos: ${createDataSubjectError.message}`,
+            createDataSubjectError,
+          );
+          throw new Error(
+            `Error al crear titular de datos: ${createDataSubjectError.message}`,
+          );
         }
 
         dataSubjectId = newDataSubject.id;
@@ -251,26 +318,32 @@ export class ConsentsService {
       expiresAt.setDate(expiresAt.getDate() + 30);
 
       // Crear la solicitud de consentimiento
-      const { data: consentRequest, error: createRequestError } = await this.supabase
-        .from('consent_request')
-        .insert({
-          data_subject_id: dataSubjectId,
-          legal_policy_id: createRequestDto.legalPolicyId,
-          company_id: policy.company_id,
-          status: 'PENDING',
-          expires_at: expiresAt.toISOString(),
-          metadata: {
-            ...createRequestDto.metadata,
-            data_type_ids: createRequestDto.dataTypeIds,
-            created_by: userId,
-          },
-        })
-        .select()
-        .single();
+      const { data: consentRequest, error: createRequestError } =
+        await this.supabase
+          .from('consent_request')
+          .insert({
+            data_subject_id: dataSubjectId,
+            legal_policy_id: createRequestDto.legalPolicyId,
+            company_id: policy.company_id,
+            status: 'PENDING',
+            expires_at: expiresAt.toISOString(),
+            metadata: {
+              ...createRequestDto.metadata,
+              data_type_ids: createRequestDto.dataTypeIds,
+              created_by: userId,
+            },
+          })
+          .select()
+          .single();
 
       if (createRequestError) {
-        this.logger.error(`Error al crear solicitud: ${createRequestError.message}`, createRequestError);
-        throw new Error(`Error al crear solicitud: ${createRequestError.message}`);
+        this.logger.error(
+          `Error al crear solicitud: ${createRequestError.message}`,
+          createRequestError,
+        );
+        throw new Error(
+          `Error al crear solicitud: ${createRequestError.message}`,
+        );
       }
 
       // Registrar la acción en el log de auditoría
@@ -295,6 +368,10 @@ export class ConsentsService {
 
   /**
    * Obtiene una solicitud de consentimiento por su ID
+   * @param id - ID único de la solicitud de consentimiento a buscar
+   * @returns Solicitud de consentimiento encontrada
+   * @throws NotFoundException si la solicitud no existe
+   * @throws Error si hay un problema al obtener la solicitud
    */
   async findRequest(id: string): Promise<ConsentRequestDto> {
     try {
@@ -306,7 +383,9 @@ export class ConsentsService {
 
       if (error || !data) {
         this.logger.error(`Solicitud no encontrada: ${error?.message}`);
-        throw new NotFoundException('Solicitud de consentimiento no encontrada');
+        throw new NotFoundException(
+          'Solicitud de consentimiento no encontrada',
+        );
       }
 
       return data as ConsentRequestDto;
@@ -318,6 +397,14 @@ export class ConsentsService {
 
   /**
    * Responde a una solicitud de consentimiento
+   * @param id - ID único de la solicitud de consentimiento a responder
+   * @param respondDto - DTO con la respuesta (aceptación o rechazo) a la solicitud
+   * @param ipAddress - Dirección IP del usuario que responde (opcional)
+   * @param userAgent - Agente de usuario del navegador que responde (opcional)
+   * @returns Consentimiento creado como resultado de la respuesta
+   * @throws NotFoundException si la solicitud no existe
+   * @throws BadRequestException si la solicitud ya ha sido respondida o ha expirado
+   * @throws Error si hay un problema al responder a la solicitud
    */
   async respondToRequest(
     id: string,
@@ -335,7 +422,9 @@ export class ConsentsService {
 
       if (fetchError || !request) {
         this.logger.error(`Solicitud no encontrada: ${fetchError?.message}`);
-        throw new NotFoundException('Solicitud de consentimiento no encontrada');
+        throw new NotFoundException(
+          'Solicitud de consentimiento no encontrada',
+        );
       }
 
       // Verificar si la solicitud ya ha sido respondida
@@ -357,7 +446,9 @@ export class ConsentsService {
           data_subject_id: request.data_subject_id,
           legal_policy_id: request.legal_policy_id,
           consent_request_id: id,
-          status: respondDto.accepted ? ConsentStatus.GRANTED : ConsentStatus.DENIED,
+          status: respondDto.accepted
+            ? ConsentStatus.GRANTED
+            : ConsentStatus.DENIED,
           metadata: {
             ...respondDto.metadata,
             ip_address: ipAddress,
@@ -369,23 +460,35 @@ export class ConsentsService {
         .single();
 
       if (insertError) {
-        this.logger.error(`Error al crear consentimiento: ${insertError.message}`, insertError);
+        this.logger.error(
+          `Error al crear consentimiento: ${insertError.message}`,
+          insertError,
+        );
         throw new Error('Error al crear registro de consentimiento');
       }
 
       // Si se aceptó y hay tipos de datos aceptados, registrarlos
-      if (respondDto.accepted && respondDto.acceptedDataTypeIds && respondDto.acceptedDataTypeIds.length > 0) {
-        const dataTypeEntries = respondDto.acceptedDataTypeIds.map(dataTypeId => ({
-          consent_id: consent.id,
-          data_type_id: dataTypeId,
-        }));
+      if (
+        respondDto.accepted &&
+        respondDto.acceptedDataTypeIds &&
+        respondDto.acceptedDataTypeIds.length > 0
+      ) {
+        const dataTypeEntries = respondDto.acceptedDataTypeIds.map(
+          (dataTypeId) => ({
+            consent_id: consent.id,
+            data_type_id: dataTypeId,
+          }),
+        );
 
         const { error: dataTypeError } = await this.supabase
           .from('consent_data_type')
           .insert(dataTypeEntries);
 
         if (dataTypeError) {
-          this.logger.error(`Error al registrar tipos de datos: ${dataTypeError.message}`, dataTypeError);
+          this.logger.error(
+            `Error al registrar tipos de datos: ${dataTypeError.message}`,
+            dataTypeError,
+          );
         }
       }
 
@@ -398,12 +501,17 @@ export class ConsentsService {
         .eq('id', id);
 
       if (updateError) {
-        this.logger.error(`Error al actualizar solicitud: ${updateError.message}`, updateError);
+        this.logger.error(
+          `Error al actualizar solicitud: ${updateError.message}`,
+          updateError,
+        );
       }
 
       // Registrar la acción en el log de auditoría
       await this.auditService.log({
-        action: respondDto.accepted ? AuditAction.CREATE_CONSENT : AuditAction.DELETE,
+        action: respondDto.accepted
+          ? AuditAction.CREATE_CONSENT
+          : AuditAction.DELETE,
         resourceType: ResourceType.CONSENT,
         resourceId: consent.id,
         metadata: {
@@ -417,15 +525,25 @@ export class ConsentsService {
 
       return consent as ConsentDto;
     } catch (error) {
-      this.logger.error(`Error al responder solicitud: ${error.message}`, error);
+      this.logger.error(
+        `Error al responder solicitud: ${error.message}`,
+        error,
+      );
       throw error;
     }
   }
 
   /**
    * Valida la transición de estado de un consentimiento
+   * @param currentStatus - Estado actual del consentimiento
+   * @param newStatus - Nuevo estado al que se quiere transicionar
+   * @throws BadRequestException si la transición de estado no es válida
+   * @private
    */
-  private validateStatusTransition(currentStatus: ConsentStatus, newStatus: ConsentStatus): void {
+  private validateStatusTransition(
+    currentStatus: ConsentStatus,
+    newStatus: ConsentStatus,
+  ): void {
     // Definir las transiciones válidas
     const validTransitions: Record<ConsentStatus, ConsentStatus[]> = {
       [ConsentStatus.PENDING]: [ConsentStatus.GRANTED, ConsentStatus.DENIED],

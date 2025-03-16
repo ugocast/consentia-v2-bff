@@ -28,7 +28,9 @@ export class ReportsController {
     description: 'Reporte de consentimientos generado exitosamente',
     type: ConsentReportResultDto,
   })
-  async generateConsentReport(@Query() queryDto: ConsentReportQueryDto): Promise<ConsentReportResultDto> {
+  async generateConsentReport(
+    @Query() queryDto: ConsentReportQueryDto,
+  ): Promise<ConsentReportResultDto> {
     return this.reportsService.generateConsentReport(queryDto);
   }
 
@@ -40,7 +42,9 @@ export class ReportsController {
     description: 'Reporte de auditoría generado exitosamente',
     type: AuditReportResultDto,
   })
-  async generateAuditReport(@Query() queryDto: AuditReportQueryDto): Promise<AuditReportResultDto> {
+  async generateAuditReport(
+    @Query() queryDto: AuditReportQueryDto,
+  ): Promise<AuditReportResultDto> {
     return this.reportsService.generateAuditReport(queryDto);
   }
 
@@ -52,7 +56,9 @@ export class ReportsController {
     description: 'Métricas generadas exitosamente',
     type: MetricsResultDto,
   })
-  async generateMetrics(@Query() queryDto: MetricsQueryDto): Promise<MetricsResultDto> {
+  async generateMetrics(
+    @Query() queryDto: MetricsQueryDto,
+  ): Promise<MetricsResultDto> {
     return this.reportsService.generateMetrics(queryDto);
   }
 }

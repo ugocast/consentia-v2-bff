@@ -17,10 +17,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: any) {
     // You can add additional validation logic here
     // For example, checking if the user still exists in the database
-    return { 
-      userId: payload.sub, 
+    return {
+      userId: payload.sub,
       username: payload.username,
-      roles: payload.roles
+      roles: payload.roles,
     };
   }
-} 
+}

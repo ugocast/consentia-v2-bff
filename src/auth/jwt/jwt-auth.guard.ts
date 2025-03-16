@@ -20,7 +20,9 @@ export class JwtAuthGuard implements CanActivate {
     const authHeader = request.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Token de autenticación no proporcionado');
+      throw new UnauthorizedException(
+        'Token de autenticación no proporcionado',
+      );
     }
 
     const token = authHeader.split(' ')[1];
@@ -48,4 +50,4 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Error al verificar la autenticación');
     }
   }
-} 
+}

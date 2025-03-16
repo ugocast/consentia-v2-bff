@@ -1,6 +1,11 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { createSupabaseClient } from '../config/supabase.config';
-import { LoginDto, RegisterDto, ResetPasswordDto, UpdatePasswordDto } from './dto/auth.dto';
+import {
+  LoginDto,
+  RegisterDto,
+  ResetPasswordDto,
+  UpdatePasswordDto,
+} from './dto/auth.dto';
 
 @Injectable()
 export class AuthService {
@@ -13,15 +18,16 @@ export class AuthService {
     const { email, password, name } = registerDto;
 
     // Registrar usuario en Supabase Auth
-    const { data: authData, error: authError } = await this.supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name,
+    const { data: authData, error: authError } =
+      await this.supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+          },
         },
-      },
-    });
+      });
 
     if (authError) {
       throw new Error(`Error al registrar usuario: ${authError.message}`);
@@ -82,10 +88,15 @@ export class AuthService {
     });
 
     if (error) {
-      throw new Error(`Error al solicitar restablecimiento de contraseña: ${error.message}`);
+      throw new Error(
+        `Error al solicitar restablecimiento de contraseña: ${error.message}`,
+      );
     }
 
-    return { success: true, message: 'Se ha enviado un correo para restablecer la contraseña' };
+    return {
+      success: true,
+      message: 'Se ha enviado un correo para restablecer la contraseña',
+    };
   }
 
   /**

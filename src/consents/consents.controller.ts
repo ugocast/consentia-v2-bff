@@ -121,7 +121,7 @@ export class ConsentsController {
   ): Promise<ConsentDto> {
     const ipAddress = req.ip || req.socket.remoteAddress;
     const userAgent = req.headers['user-agent'];
-    
+
     return this.consentsService.respondToRequest(
       id,
       respondDto,

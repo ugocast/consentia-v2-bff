@@ -12,12 +12,13 @@ export class UsersService {
    */
   async getCurrentUser(userId: string): Promise<UserDto> {
     // Obtenemos los datos de autenticación
-    const { data: authData, error: authError } = await this.supabaseAdmin.auth.admin.getUserById(
-      userId,
-    );
+    const { data: authData, error: authError } =
+      await this.supabaseAdmin.auth.admin.getUserById(userId);
 
     if (authError || !authData.user) {
-      throw new NotFoundException(`Usuario no encontrado: ${authError?.message}`);
+      throw new NotFoundException(
+        `Usuario no encontrado: ${authError?.message}`,
+      );
     }
 
     // Creamos el objeto de usuario con los datos de autenticación
@@ -35,14 +36,18 @@ export class UsersService {
   /**
    * Actualiza el perfil del usuario
    */
-  async updateUser(userId: string, updateUserDto: UpdateUserDto): Promise<UserDto> {
+  async updateUser(
+    userId: string,
+    updateUserDto: UpdateUserDto,
+  ): Promise<UserDto> {
     const updates: any = { ...updateUserDto };
-    
+
     // Si se actualiza el email, lo hacemos a través de la API de autenticación
     if (updates.email) {
-      const { error: authError } = await this.supabaseAdmin.auth.admin.updateUserById(userId, {
-        email: updates.email,
-      });
+      const { error: authError } =
+        await this.supabaseAdmin.auth.admin.updateUserById(userId, {
+          email: updates.email,
+        });
 
       if (authError) {
         throw new Error(`Error al actualizar email: ${authError.message}`);
@@ -51,9 +56,10 @@ export class UsersService {
 
     // Si se actualiza el nombre, lo hacemos a través de la API de autenticación
     if (updates.name) {
-      const { error: metadataError } = await this.supabaseAdmin.auth.admin.updateUserById(userId, {
-        user_metadata: { name: updates.name },
-      });
+      const { error: metadataError } =
+        await this.supabaseAdmin.auth.admin.updateUserById(userId, {
+          user_metadata: { name: updates.name },
+        });
 
       if (metadataError) {
         throw new Error(`Error al actualizar nombre: ${metadataError.message}`);

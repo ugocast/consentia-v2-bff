@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, IsUUID } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsArray,
+  IsUUID,
+} from 'class-validator';
 
 /**
  * DTO para la creación de políticas legales
@@ -35,4 +41,4 @@ export class CreatePolicyDto {
   @IsArray()
   @IsOptional()
   dataTypes?: string[];
-} 
+}

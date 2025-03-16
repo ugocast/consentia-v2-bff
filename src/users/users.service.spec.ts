@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { mockSupabaseClient, mockCreateSupabaseClient } from '../common/mocks/supabase.mock';
+import { mockSupabaseClient } from '../common/mocks/supabase.mock';
 import { UpdateUserDto } from './dto/user.dto';
 import * as supabaseConfig from '../config/supabase.config';
 
@@ -16,10 +16,12 @@ describe('UsersService', () => {
   beforeEach(async () => {
     // Resetear todos los mocks antes de cada prueba
     jest.clearAllMocks();
-    
+
     // Configurar el mock para devolver el cliente de Supabase
-    (supabaseConfig.createSupabaseClient as jest.Mock).mockReturnValue(mockSupabaseClient);
-    
+    (supabaseConfig.createSupabaseClient as jest.Mock).mockReturnValue(
+      mockSupabaseClient,
+    );
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [UsersService],
     }).compile();
@@ -42,7 +44,7 @@ describe('UsersService', () => {
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-01T00:00:00Z',
       };
-      
+
       mockSupabaseClient.auth.admin.getUserById.mockResolvedValue({
         data: { user: mockUser },
         error: null,
@@ -52,7 +54,9 @@ describe('UsersService', () => {
       const result = await service.getCurrentUser(userId);
 
       // Assert
-      expect(mockSupabaseClient.auth.admin.getUserById).toHaveBeenCalledWith(userId);
+      expect(mockSupabaseClient.auth.admin.getUserById).toHaveBeenCalledWith(
+        userId,
+      );
       expect(result).toEqual({
         id: mockUser.id,
         email: mockUser.email,
@@ -65,14 +69,16 @@ describe('UsersService', () => {
     it('should throw NotFoundException when user is not found', async () => {
       // Arrange
       const userId = 'non-existent-user-id';
-      
+
       mockSupabaseClient.auth.admin.getUserById.mockResolvedValue({
         data: { user: null },
         error: { message: 'User not found' },
       });
 
       // Act & Assert
-      await expect(service.getCurrentUser(userId)).rejects.toThrow(NotFoundException);
+      await expect(service.getCurrentUser(userId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -84,7 +90,7 @@ describe('UsersService', () => {
         email: 'updated@example.com',
         name: 'Updated User',
       };
-      
+
       const mockUser = {
         id: userId,
         email: updateUserDto.email,
@@ -92,12 +98,12 @@ describe('UsersService', () => {
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-02T00:00:00Z',
       };
-      
+
       mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue({
         data: { user: mockUser },
         error: null,
       });
-      
+
       mockSupabaseClient.auth.admin.getUserById.mockResolvedValue({
         data: { user: mockUser },
         error: null,
@@ -111,9 +117,9 @@ describe('UsersService', () => {
         userId,
         expect.objectContaining({
           email: updateUserDto.email,
-        })
+        }),
       );
-      
+
       expect(result).toEqual({
         id: mockUser.id,
         email: mockUser.email,
@@ -129,7 +135,7 @@ describe('UsersService', () => {
       const updateUserDto: UpdateUserDto = {
         name: 'Updated User',
       };
-      
+
       const mockUser = {
         id: userId,
         email: 'existing@example.com',
@@ -137,12 +143,12 @@ describe('UsersService', () => {
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-02T00:00:00Z',
       };
-      
+
       mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue({
         data: { user: mockUser },
         error: null,
       });
-      
+
       mockSupabaseClient.auth.admin.getUserById.mockResolvedValue({
         data: { user: mockUser },
         error: null,
@@ -156,9 +162,9 @@ describe('UsersService', () => {
         userId,
         expect.objectContaining({
           user_metadata: { name: updateUserDto.name },
-        })
+        }),
       );
-      
+
       expect(result).toEqual({
         id: mockUser.id,
         email: mockUser.email,
@@ -175,7 +181,7 @@ describe('UsersService', () => {
         email: 'invalid-email',
         name: 'Updated User',
       };
-      
+
       mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue({
         data: { user: null },
         error: { message: 'Invalid email format' },
@@ -192,7 +198,7 @@ describe('UsersService', () => {
     it('should delete a user', async () => {
       // Arrange
       const userId = 'user-id';
-      
+
       mockSupabaseClient.auth.admin.deleteUser.mockResolvedValue({
         error: null,
       });
@@ -201,14 +207,16 @@ describe('UsersService', () => {
       const result = await service.deleteUser(userId);
 
       // Assert
-      expect(mockSupabaseClient.auth.admin.deleteUser).toHaveBeenCalledWith(userId);
+      expect(mockSupabaseClient.auth.admin.deleteUser).toHaveBeenCalledWith(
+        userId,
+      );
       expect(result).toEqual({ success: true });
     });
 
     it('should throw an error when delete fails', async () => {
       // Arrange
       const userId = 'non-existent-user-id';
-      
+
       mockSupabaseClient.auth.admin.deleteUser.mockResolvedValue({
         error: { message: 'User not found' },
       });

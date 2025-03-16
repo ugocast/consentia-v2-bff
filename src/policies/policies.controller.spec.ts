@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PoliciesController } from './policies.controller';
 import { PoliciesService } from './policies.service';
 import { CreatePolicyDto, UpdatePolicyDto, PolicyDto } from './dto';
+import { PolicyStatus } from './dto/policy-status.enum';
 
 // Mock del servicio de políticas
 const mockPoliciesService = {
@@ -19,7 +20,7 @@ describe('PoliciesController', () => {
   beforeEach(async () => {
     // Resetear todos los mocks antes de cada prueba
     jest.clearAllMocks();
-    
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PoliciesController],
       providers: [
@@ -52,10 +53,10 @@ describe('PoliciesController', () => {
           updated_at: '2023-01-01T00:00:00Z',
           valid_from: '2023-01-01T00:00:00Z',
           valid_to: null,
-          status: 'ACTIVE',
+          status: PolicyStatus.ACTIVE,
         },
       ];
-      
+
       mockPoliciesService.findAll.mockResolvedValue(mockPolicies);
 
       // Act
@@ -81,10 +82,10 @@ describe('PoliciesController', () => {
           updated_at: '2023-01-01T00:00:00Z',
           valid_from: '2023-01-01T00:00:00Z',
           valid_to: null,
-          status: 'ACTIVE',
+          status: PolicyStatus.ACTIVE,
         },
       ];
-      
+
       mockPoliciesService.findAll.mockResolvedValue(mockPolicies);
 
       // Act
@@ -111,9 +112,9 @@ describe('PoliciesController', () => {
         updated_at: '2023-01-01T00:00:00Z',
         valid_from: '2023-01-01T00:00:00Z',
         valid_to: null,
-        status: 'ACTIVE',
+        status: PolicyStatus.ACTIVE,
       };
-      
+
       mockPoliciesService.findOne.mockResolvedValue(mockPolicy);
 
       // Act
@@ -133,13 +134,13 @@ describe('PoliciesController', () => {
         content: 'New privacy policy content',
         companyId: 'company-1',
       };
-      
+
       const mockRequest = {
         user: {
           id: 'user-1',
         },
       };
-      
+
       const mockCreatedPolicy: PolicyDto = {
         id: 'new-policy-id',
         title: createPolicyDto.title,
@@ -151,16 +152,22 @@ describe('PoliciesController', () => {
         updated_at: '2023-01-01T00:00:00Z',
         valid_from: '2023-01-01T00:00:00Z',
         valid_to: null,
-        status: 'ACTIVE',
+        status: PolicyStatus.ACTIVE,
       };
-      
+
       mockPoliciesService.create.mockResolvedValue(mockCreatedPolicy);
 
       // Act
-      const result = await controller.create(createPolicyDto, mockRequest as any);
+      const result = await controller.create(
+        createPolicyDto,
+        mockRequest as any,
+      );
 
       // Assert
-      expect(mockPoliciesService.create).toHaveBeenCalledWith(createPolicyDto, mockRequest.user.id);
+      expect(mockPoliciesService.create).toHaveBeenCalledWith(
+        createPolicyDto,
+        mockRequest.user.id,
+      );
       expect(result).toEqual(mockCreatedPolicy);
     });
   });
@@ -172,13 +179,13 @@ describe('PoliciesController', () => {
       const updatePolicyDto: UpdatePolicyDto = {
         title: 'Updated Privacy Policy',
       };
-      
+
       const mockRequest = {
         user: {
           id: 'user-1',
         },
       };
-      
+
       const mockUpdatedPolicy: PolicyDto = {
         id: policyId,
         title: updatePolicyDto.title,
@@ -190,16 +197,24 @@ describe('PoliciesController', () => {
         updated_at: '2023-01-02T00:00:00Z',
         valid_from: '2023-01-02T00:00:00Z',
         valid_to: null,
-        status: 'ACTIVE',
+        status: PolicyStatus.ACTIVE,
       };
-      
+
       mockPoliciesService.update.mockResolvedValue(mockUpdatedPolicy);
 
       // Act
-      const result = await controller.update(policyId, updatePolicyDto, mockRequest as any);
+      const result = await controller.update(
+        policyId,
+        updatePolicyDto,
+        mockRequest as any,
+      );
 
       // Assert
-      expect(mockPoliciesService.update).toHaveBeenCalledWith(policyId, updatePolicyDto, mockRequest.user.id);
+      expect(mockPoliciesService.update).toHaveBeenCalledWith(
+        policyId,
+        updatePolicyDto,
+        mockRequest.user.id,
+      );
       expect(result).toEqual(mockUpdatedPolicy);
     });
   });
@@ -213,16 +228,19 @@ describe('PoliciesController', () => {
           id: 'user-1',
         },
       };
-      
+
       const mockResult = { success: true };
-      
+
       mockPoliciesService.remove.mockResolvedValue(mockResult);
 
       // Act
       const result = await controller.remove(policyId, mockRequest as any);
 
       // Assert
-      expect(mockPoliciesService.remove).toHaveBeenCalledWith(policyId, mockRequest.user.id);
+      expect(mockPoliciesService.remove).toHaveBeenCalledWith(
+        policyId,
+        mockRequest.user.id,
+      );
       expect(result).toEqual(mockResult);
     });
   });
@@ -243,7 +261,7 @@ describe('PoliciesController', () => {
           updated_at: '2023-01-02T00:00:00Z',
           valid_from: '2023-01-02T00:00:00Z',
           valid_to: null,
-          status: 'ACTIVE',
+          status: PolicyStatus.ACTIVE,
         },
         {
           id: 'policy-1-v1',
@@ -256,17 +274,19 @@ describe('PoliciesController', () => {
           updated_at: '2023-01-01T00:00:00Z',
           valid_from: '2023-01-01T00:00:00Z',
           valid_to: '2023-01-02T00:00:00Z',
-          status: 'INACTIVE',
+          status: PolicyStatus.INACTIVE,
         },
       ];
-      
+
       mockPoliciesService.getVersionHistory.mockResolvedValue(mockVersions);
 
       // Act
       const result = await controller.getVersionHistory(policyId);
 
       // Assert
-      expect(mockPoliciesService.getVersionHistory).toHaveBeenCalledWith(policyId);
+      expect(mockPoliciesService.getVersionHistory).toHaveBeenCalledWith(
+        policyId,
+      );
       expect(result).toEqual(mockVersions);
     });
   });

@@ -2,8 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { PoliciesService } from './policies.service';
 import { AuditService } from '../common/audit/audit.service';
-import { mockSupabaseClient, mockCreateSupabaseClient } from '../common/mocks/supabase.mock';
+import {
+  mockSupabaseClient,
+  mockCreateSupabaseClient,
+} from '../common/mocks/supabase.mock';
 import { CreatePolicyDto, UpdatePolicyDto, PolicyDto } from './dto';
+import { PolicyStatus } from './dto/policy-status.enum';
 
 // Mock del servicio de auditoría
 const mockAuditService = {
@@ -17,15 +21,14 @@ jest.mock('../config/supabase.config', () => ({
 
 describe('PoliciesService', () => {
   let service: PoliciesService;
-  let auditService: AuditService;
 
   beforeEach(async () => {
     // Resetear todos los mocks antes de cada prueba
     jest.clearAllMocks();
-    
+
     // Configurar el mock para devolver el cliente de Supabase
     mockCreateSupabaseClient.mockReturnValue(mockSupabaseClient);
-    
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PoliciesService,
@@ -37,7 +40,6 @@ describe('PoliciesService', () => {
     }).compile();
 
     service = module.get<PoliciesService>(PoliciesService);
-    auditService = module.get<AuditService>(AuditService);
   });
 
   it('should be defined', () => {
@@ -59,7 +61,7 @@ describe('PoliciesService', () => {
           updated_at: '2023-01-01T00:00:00Z',
           valid_from: '2023-01-01T00:00:00Z',
           valid_to: null,
-          status: 'ACTIVE',
+          status: PolicyStatus.ACTIVE,
         },
         {
           id: 'policy-2',
@@ -72,7 +74,7 @@ describe('PoliciesService', () => {
           updated_at: '2023-01-01T00:00:00Z',
           valid_from: '2023-01-01T00:00:00Z',
           valid_to: null,
-          status: 'ACTIVE',
+          status: PolicyStatus.ACTIVE,
         },
       ];
 
@@ -111,7 +113,7 @@ describe('PoliciesService', () => {
           updated_at: '2023-01-01T00:00:00Z',
           valid_from: '2023-01-01T00:00:00Z',
           valid_to: null,
-          status: 'ACTIVE',
+          status: PolicyStatus.ACTIVE,
         },
       ];
 
@@ -132,7 +134,10 @@ describe('PoliciesService', () => {
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('legal_policy');
       expect(mockSupabaseClient.select).toHaveBeenCalledWith('*');
       expect(mockSupabaseClient.is).toHaveBeenCalledWith('valid_to', null);
-      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('company_id', companyId);
+      expect(mockSupabaseClient.eq).toHaveBeenCalledWith(
+        'company_id',
+        companyId,
+      );
       expect(result).toEqual(mockPolicies);
     });
 
@@ -147,7 +152,9 @@ describe('PoliciesService', () => {
       });
 
       // Act & Assert
-      await expect(service.findAll()).rejects.toThrow('Error al obtener políticas: Database error');
+      await expect(service.findAll()).rejects.toThrow(
+        'Error al obtener políticas: Database error',
+      );
     });
   });
 
@@ -166,7 +173,7 @@ describe('PoliciesService', () => {
         updated_at: '2023-01-01T00:00:00Z',
         valid_from: '2023-01-01T00:00:00Z',
         valid_to: null,
-        status: 'ACTIVE',
+        status: PolicyStatus.ACTIVE,
       };
 
       // Mock de la respuesta de Supabase
@@ -205,7 +212,9 @@ describe('PoliciesService', () => {
       });
 
       // Act & Assert
-      await expect(service.findOne(policyId)).rejects.toThrow(NotFoundException);
+      await expect(service.findOne(policyId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -230,7 +239,7 @@ describe('PoliciesService', () => {
         updated_at: '2023-01-01T00:00:00Z',
         valid_from: '2023-01-01T00:00:00Z',
         valid_to: null,
-        status: 'ACTIVE',
+        status: PolicyStatus.ACTIVE,
       };
 
       // Mock de la respuesta de Supabase
@@ -247,12 +256,14 @@ describe('PoliciesService', () => {
 
       // Assert
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('legal_policy');
-      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(expect.objectContaining({
-        title: createPolicyDto.title,
-        content: createPolicyDto.content,
-        company_id: createPolicyDto.company_id,
-        created_by: userId,
-      }));
+      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: createPolicyDto.title,
+          content: createPolicyDto.content,
+          company_id: createPolicyDto.company_id,
+          created_by: userId,
+        }),
+      );
       expect(mockSupabaseClient.select).toHaveBeenCalledWith('*');
       expect(mockSupabaseClient.single).toHaveBeenCalled();
       expect(result).toEqual(mockCreatedPolicy);
@@ -278,7 +289,9 @@ describe('PoliciesService', () => {
       });
 
       // Act & Assert
-      await expect(service.create(createPolicyDto, userId)).rejects.toThrow('Error al crear política: Database error');
+      await expect(service.create(createPolicyDto, userId)).rejects.toThrow(
+        'Error al crear política: Database error',
+      );
     });
   });
 
@@ -303,7 +316,7 @@ describe('PoliciesService', () => {
         updated_at: '2023-01-01T00:00:00Z',
         valid_from: '2023-01-01T00:00:00Z',
         valid_to: null,
-        status: 'ACTIVE',
+        status: PolicyStatus.ACTIVE,
       };
 
       const mockUpdatedPolicy: PolicyDto = {
@@ -313,6 +326,7 @@ describe('PoliciesService', () => {
         content: updatePolicyDto.content,
         version: 2,
         updated_at: '2023-01-02T00:00:00Z',
+        status: PolicyStatus.ACTIVE,
       };
 
       // Mock para obtener la política existente
@@ -320,7 +334,8 @@ describe('PoliciesService', () => {
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.is.mockReturnValue(mockSupabaseClient);
-      mockSupabaseClient.single = jest.fn()
+      mockSupabaseClient.single = jest
+        .fn()
         .mockResolvedValueOnce({
           data: mockExistingPolicy,
           error: null,
@@ -344,21 +359,25 @@ describe('PoliciesService', () => {
       expect(mockSupabaseClient.select).toHaveBeenCalledWith('*');
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('id', policyId);
       expect(mockSupabaseClient.is).toHaveBeenCalledWith('valid_to', null);
-      
+
       // Verificar que se actualizó la política existente
-      expect(mockSupabaseClient.update).toHaveBeenCalledWith(expect.objectContaining({
-        valid_to: expect.any(String),
-      }));
-      
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          valid_to: expect.any(String),
+        }),
+      );
+
       // Verificar que se insertó la nueva versión
-      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(expect.objectContaining({
-        title: updatePolicyDto.title,
-        content: updatePolicyDto.content,
-        version: 2,
-        company_id: mockExistingPolicy.company_id,
-        created_by: userId,
-      }));
-      
+      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: updatePolicyDto.title,
+          content: updatePolicyDto.content,
+          version: 2,
+          company_id: mockExistingPolicy.company_id,
+          created_by: userId,
+        }),
+      );
+
       expect(result).toEqual(mockUpdatedPolicy);
       expect(mockAuditService.log).toHaveBeenCalled();
     });
@@ -382,7 +401,9 @@ describe('PoliciesService', () => {
       });
 
       // Act & Assert
-      await expect(service.update(policyId, updatePolicyDto, userId)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.update(policyId, updatePolicyDto, userId),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -403,7 +424,7 @@ describe('PoliciesService', () => {
         updated_at: '2023-01-01T00:00:00Z',
         valid_from: '2023-01-01T00:00:00Z',
         valid_to: null,
-        status: 'ACTIVE',
+        status: PolicyStatus.ACTIVE,
       };
 
       // Mock para obtener la política existente
@@ -431,13 +452,15 @@ describe('PoliciesService', () => {
       expect(mockSupabaseClient.select).toHaveBeenCalledWith('*');
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('id', policyId);
       expect(mockSupabaseClient.is).toHaveBeenCalledWith('valid_to', null);
-      
+
       // Verificar que se actualizó la política existente
-      expect(mockSupabaseClient.update).toHaveBeenCalledWith(expect.objectContaining({
-        valid_to: expect.any(String),
-        status: 'DELETED',
-      }));
-      
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          valid_to: expect.any(String),
+          status: PolicyStatus.DELETED,
+        }),
+      );
+
       expect(result).toEqual({ success: true });
       expect(mockAuditService.log).toHaveBeenCalled();
     });
@@ -458,7 +481,9 @@ describe('PoliciesService', () => {
       });
 
       // Act & Assert
-      await expect(service.remove(policyId, userId)).rejects.toThrow(NotFoundException);
+      await expect(service.remove(policyId, userId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -478,7 +503,7 @@ describe('PoliciesService', () => {
           updated_at: '2023-01-02T00:00:00Z',
           valid_from: '2023-01-02T00:00:00Z',
           valid_to: null,
-          status: 'ACTIVE',
+          status: PolicyStatus.ACTIVE,
         },
         {
           id: 'policy-1-v1',
@@ -491,7 +516,7 @@ describe('PoliciesService', () => {
           updated_at: '2023-01-01T00:00:00Z',
           valid_from: '2023-01-01T00:00:00Z',
           valid_to: '2023-01-02T00:00:00Z',
-          status: 'INACTIVE',
+          status: PolicyStatus.INACTIVE,
         },
       ];
 
@@ -511,8 +536,13 @@ describe('PoliciesService', () => {
       // Assert
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('legal_policy');
       expect(mockSupabaseClient.select).toHaveBeenCalledWith('*');
-      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('previous_version_id', policyId);
-      expect(mockSupabaseClient.order).toHaveBeenCalledWith('version', { ascending: false });
+      expect(mockSupabaseClient.eq).toHaveBeenCalledWith(
+        'previous_version_id',
+        policyId,
+      );
+      expect(mockSupabaseClient.order).toHaveBeenCalledWith('version', {
+        ascending: false,
+      });
       expect(result).toEqual(mockVersions);
     });
 

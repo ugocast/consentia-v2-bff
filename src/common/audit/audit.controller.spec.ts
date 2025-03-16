@@ -25,9 +25,9 @@ describe('AuditController', () => {
         },
       ],
     })
-    .overrideGuard(JwtGuard)
-    .useValue(mockJwtGuard)
-    .compile();
+      .overrideGuard(JwtGuard)
+      .useValue(mockJwtGuard)
+      .compile();
 
     controller = module.get<AuditController>(AuditController);
     service = module.get<AuditService>(AuditService);
@@ -167,4 +167,4 @@ describe('AuditController', () => {
       expect(result).toEqual(mockLogs);
     });
   });
-}); 
+});

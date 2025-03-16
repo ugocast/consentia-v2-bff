@@ -16,4 +16,4 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEmail({}, { message: 'Por favor, proporciona un email válido' })
   email?: string;
-} 
+}

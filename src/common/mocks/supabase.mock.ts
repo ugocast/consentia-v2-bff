@@ -37,47 +37,57 @@ interface AdminUserResponse {
 // Crear un mock para el cliente de Supabase
 export const mockSupabaseClient = {
   auth: {
-    signUp: jest.fn<() => Promise<AuthResponse>>().mockImplementation(() => 
-      Promise.resolve({ 
-        data: { user: null, session: null }, 
-        error: null 
-      })
+    signUp: jest.fn<() => Promise<AuthResponse>>().mockImplementation(() =>
+      Promise.resolve({
+        data: { user: null, session: null },
+        error: null,
+      }),
     ),
-    signInWithPassword: jest.fn<() => Promise<AuthResponse>>().mockImplementation(() => 
-      Promise.resolve({ 
-        data: { user: null, session: null }, 
-        error: null 
-      })
-    ),
-    signOut: jest.fn<() => Promise<SignOutResponse>>().mockImplementation(() => 
-      Promise.resolve({ error: null })
-    ),
-    resetPasswordForEmail: jest.fn<() => Promise<SignOutResponse>>().mockImplementation(() => 
-      Promise.resolve({ error: null })
-    ),
-    updateUser: jest.fn<() => Promise<SignOutResponse>>().mockImplementation(() => 
-      Promise.resolve({ error: null })
-    ),
-    getUser: jest.fn<() => Promise<UserResponse>>().mockImplementation(() => 
-      Promise.resolve({ data: { user: null }, error: null })
-    ),
-    refreshSession: jest.fn<() => Promise<AuthResponse>>().mockImplementation(() => 
-      Promise.resolve({ 
-        data: { user: null, session: null }, 
-        error: null 
-      })
-    ),
+    signInWithPassword: jest
+      .fn<() => Promise<AuthResponse>>()
+      .mockImplementation(() =>
+        Promise.resolve({
+          data: { user: null, session: null },
+          error: null,
+        }),
+      ),
+    signOut: jest
+      .fn<() => Promise<SignOutResponse>>()
+      .mockImplementation(() => Promise.resolve({ error: null })),
+    resetPasswordForEmail: jest
+      .fn<() => Promise<SignOutResponse>>()
+      .mockImplementation(() => Promise.resolve({ error: null })),
+    updateUser: jest
+      .fn<() => Promise<SignOutResponse>>()
+      .mockImplementation(() => Promise.resolve({ error: null })),
+    getUser: jest
+      .fn<() => Promise<UserResponse>>()
+      .mockImplementation(() =>
+        Promise.resolve({ data: { user: null }, error: null }),
+      ),
+    refreshSession: jest
+      .fn<() => Promise<AuthResponse>>()
+      .mockImplementation(() =>
+        Promise.resolve({
+          data: { user: null, session: null },
+          error: null,
+        }),
+      ),
     setSession: jest.fn(),
     admin: {
-      getUserById: jest.fn<() => Promise<AdminUserResponse>>().mockImplementation(() => 
-        Promise.resolve({ data: { user: null }, error: null })
-      ),
-      updateUserById: jest.fn<() => Promise<AdminUserResponse>>().mockImplementation(() => 
-        Promise.resolve({ data: { user: null }, error: null })
-      ),
-      deleteUser: jest.fn<() => Promise<SignOutResponse>>().mockImplementation(() => 
-        Promise.resolve({ error: null })
-      ),
+      getUserById: jest
+        .fn<() => Promise<AdminUserResponse>>()
+        .mockImplementation(() =>
+          Promise.resolve({ data: { user: null }, error: null }),
+        ),
+      updateUserById: jest
+        .fn<() => Promise<AdminUserResponse>>()
+        .mockImplementation(() =>
+          Promise.resolve({ data: { user: null }, error: null }),
+        ),
+      deleteUser: jest
+        .fn<() => Promise<SignOutResponse>>()
+        .mockImplementation(() => Promise.resolve({ error: null })),
     },
   },
   from: jest.fn(),
@@ -96,27 +106,30 @@ export const mockSupabaseClient = {
   order: jest.fn(),
   range: jest.fn().mockImplementation(() => {
     return {
-      then: (callback) => callback({
-        data: [],
-        error: null,
-        count: 0
-      })
+      then: (callback) =>
+        callback({
+          data: [],
+          error: null,
+          count: 0,
+        }),
     };
   }),
   single: jest.fn().mockImplementation(() => {
     return {
-      then: (callback) => callback({
-        data: {},
-        error: null
-      })
+      then: (callback) =>
+        callback({
+          data: {},
+          error: null,
+        }),
     };
   }),
   count: jest.fn().mockImplementation(() => {
     return {
-      then: (callback) => callback({
-        data: 0,
-        error: null
-      })
+      then: (callback) =>
+        callback({
+          data: 0,
+          error: null,
+        }),
     };
   }),
   then: jest.fn(),
@@ -138,10 +151,14 @@ Object.keys(mockSupabaseClient).forEach((key) => {
 });
 
 // Mock para la función createSupabaseClient
-export const mockCreateSupabaseClient = jest.fn().mockReturnValue(mockSupabaseClient);
+export const mockCreateSupabaseClient = jest
+  .fn()
+  .mockReturnValue(mockSupabaseClient);
 
 // Función auxiliar para configurar respuestas de Supabase
-export function setupSupabaseResponse<T = any>(response: SupabaseResponse<T>): void {
+export function setupSupabaseResponse<T = any>(
+  response: SupabaseResponse<T>,
+): void {
   mockSupabaseClient.then.mockImplementation(() => Promise.resolve(response));
 }
 
@@ -162,7 +179,10 @@ export function setupSupabaseSuccess<T = any>(data: T): void {
 }
 
 // Función auxiliar para configurar respuestas de éxito con conteo
-export function setupSupabaseSuccessWithCount<T = any>(data: T, count: number): void {
+export function setupSupabaseSuccessWithCount<T = any>(
+  data: T,
+  count: number,
+): void {
   setupSupabaseResponse({
     data,
     error: null,
@@ -178,7 +198,7 @@ export function resetSupabaseMocks(): void {
       mockSupabaseClient[key].mockClear();
     }
   });
-  
+
   // Restaurar el comportamiento de encadenamiento
   Object.keys(mockSupabaseClient).forEach((key) => {
     if (typeof mockSupabaseClient[key] === 'function' && key !== 'then') {
@@ -187,48 +207,48 @@ export function resetSupabaseMocks(): void {
   });
 
   // Restaurar implementaciones por defecto para métodos de auth
-  mockSupabaseClient.auth.signUp.mockImplementation(() => 
-    Promise.resolve({ 
-      data: { user: null, session: null }, 
-      error: null 
-    })
+  mockSupabaseClient.auth.signUp.mockImplementation(() =>
+    Promise.resolve({
+      data: { user: null, session: null },
+      error: null,
+    }),
   );
-  mockSupabaseClient.auth.signInWithPassword.mockImplementation(() => 
-    Promise.resolve({ 
-      data: { user: null, session: null }, 
-      error: null 
-    })
+  mockSupabaseClient.auth.signInWithPassword.mockImplementation(() =>
+    Promise.resolve({
+      data: { user: null, session: null },
+      error: null,
+    }),
   );
-  mockSupabaseClient.auth.signOut.mockImplementation(() => 
-    Promise.resolve({ error: null })
+  mockSupabaseClient.auth.signOut.mockImplementation(() =>
+    Promise.resolve({ error: null }),
   );
-  mockSupabaseClient.auth.resetPasswordForEmail.mockImplementation(() => 
-    Promise.resolve({ error: null })
+  mockSupabaseClient.auth.resetPasswordForEmail.mockImplementation(() =>
+    Promise.resolve({ error: null }),
   );
-  mockSupabaseClient.auth.updateUser.mockImplementation(() => 
-    Promise.resolve({ error: null })
+  mockSupabaseClient.auth.updateUser.mockImplementation(() =>
+    Promise.resolve({ error: null }),
   );
-  mockSupabaseClient.auth.getUser.mockImplementation(() => 
-    Promise.resolve({ data: { user: null }, error: null })
+  mockSupabaseClient.auth.getUser.mockImplementation(() =>
+    Promise.resolve({ data: { user: null }, error: null }),
   );
-  mockSupabaseClient.auth.refreshSession.mockImplementation(() => 
-    Promise.resolve({ 
-      data: { user: null, session: null }, 
-      error: null 
-    })
+  mockSupabaseClient.auth.refreshSession.mockImplementation(() =>
+    Promise.resolve({
+      data: { user: null, session: null },
+      error: null,
+    }),
   );
-  mockSupabaseClient.auth.admin.getUserById.mockImplementation(() => 
-    Promise.resolve({ data: { user: null }, error: null })
+  mockSupabaseClient.auth.admin.getUserById.mockImplementation(() =>
+    Promise.resolve({ data: { user: null }, error: null }),
   );
-  mockSupabaseClient.auth.admin.updateUserById.mockImplementation(() => 
-    Promise.resolve({ data: { user: null }, error: null })
+  mockSupabaseClient.auth.admin.updateUserById.mockImplementation(() =>
+    Promise.resolve({ data: { user: null }, error: null }),
   );
-  mockSupabaseClient.auth.admin.deleteUser.mockImplementation(() => 
-    Promise.resolve({ error: null })
+  mockSupabaseClient.auth.admin.deleteUser.mockImplementation(() =>
+    Promise.resolve({ error: null }),
   );
 }
 
 // Mock para el módulo de configuración de Supabase
 jest.mock('../../config/supabase.config', () => ({
   createSupabaseClient: mockCreateSupabaseClient,
-})); 
+}));

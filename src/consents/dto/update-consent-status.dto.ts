@@ -27,4 +27,4 @@ export class UpdateConsentStatusDto {
    */
   @IsOptional()
   metadata?: Record<string, any>;
-} 
+}

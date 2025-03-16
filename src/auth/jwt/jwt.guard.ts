@@ -15,7 +15,9 @@ export class JwtGuard implements CanActivate {
     const authHeader = request.headers.authorization;
 
     if (!authHeader) {
-      throw new UnauthorizedException('No se proporcionó token de autenticación');
+      throw new UnauthorizedException(
+        'No se proporcionó token de autenticación',
+      );
     }
 
     const token = authHeader.replace('Bearer ', '');
@@ -25,7 +27,7 @@ export class JwtGuard implements CanActivate {
       // Añadir el usuario al request para que esté disponible en los controladores
       request.user = user;
       return true;
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException('Token inválido o expirado');
     }
   }

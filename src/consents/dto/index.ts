@@ -4,4 +4,4 @@ export * from './update-consent-status.dto';
 export * from './consent.dto';
 export * from './consent-request.dto';
 export * from './consent-with-details.dto';
-export * from './consent-status.enum'; 
+export * from './consent-status.enum';

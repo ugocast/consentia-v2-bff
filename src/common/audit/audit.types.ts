@@ -67,4 +67,4 @@ export interface AuditLog {
   userId: string;
   timestamp: string;
   details?: AuditDetails;
-} 
+}

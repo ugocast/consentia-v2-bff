@@ -47,4 +47,4 @@ export class MetricsQueryDto {
   @IsEnum(MetricsGroupBy)
   @IsOptional()
   groupBy?: MetricsGroupBy = MetricsGroupBy.MONTH;
-} 
+}

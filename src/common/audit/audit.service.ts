@@ -65,7 +65,10 @@ export class AuditService {
       });
 
       if (error) {
-        this.logger.error(`Error al registrar en el log de auditoría: ${error.message}`, error);
+        this.logger.error(
+          `Error al registrar en el log de auditoría: ${error.message}`,
+          error,
+        );
       }
     } catch (error) {
       this.logger.error('Error al registrar en el log de auditoría', error);
@@ -88,7 +91,8 @@ export class AuditService {
     pageSize = 10,
   ): Promise<{ items: any[]; total: number }> {
     try {
-      const { userId, resourceType, resourceId, action, startDate, endDate } = filters;
+      const { userId, resourceType, resourceId, action, startDate, endDate } =
+        filters;
       const offset = (page - 1) * pageSize;
 
       let query = this.supabase
@@ -124,7 +128,10 @@ export class AuditService {
         .range(offset, offset + pageSize - 1);
 
       if (error) {
-        this.logger.error(`Error al obtener logs de auditoría: ${error.message}`, error);
+        this.logger.error(
+          `Error al obtener logs de auditoría: ${error.message}`,
+          error,
+        );
         throw new Error(`Error al obtener logs de auditoría: ${error.message}`);
       }
 

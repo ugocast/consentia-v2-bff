@@ -27,4 +27,4 @@ export class ConsentWithDetailsDto extends ConsentDto {
     name: string;
     description?: string;
   }>;
-} 
+}

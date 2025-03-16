@@ -2,14 +2,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { ConsentsService } from './consents.service';
 import { AuditService } from '../common/audit/audit.service';
-import { mockSupabaseClient, mockCreateSupabaseClient } from '../common/mocks/supabase.mock';
-import { 
-  ConsentDto, 
-  ConsentRequestDto, 
-  CreateConsentRequestDto, 
+import {
+  mockSupabaseClient,
+  mockCreateSupabaseClient,
+} from '../common/mocks/supabase.mock';
+import {
+  ConsentDto,
+  ConsentRequestDto,
+  CreateConsentRequestDto,
   RespondConsentRequestDto,
   UpdateConsentStatusDto,
-  ConsentStatus
+  ConsentStatus,
 } from './dto';
 
 // Mock del servicio de auditoría
@@ -24,15 +27,14 @@ jest.mock('../config/supabase.config', () => ({
 
 describe('ConsentsService', () => {
   let service: ConsentsService;
-  let auditService: AuditService;
 
   beforeEach(async () => {
     // Resetear todos los mocks antes de cada prueba
     jest.clearAllMocks();
-    
+
     // Configurar el mock para devolver el cliente de Supabase
     mockCreateSupabaseClient.mockReturnValue(mockSupabaseClient);
-    
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ConsentsService,
@@ -44,7 +46,6 @@ describe('ConsentsService', () => {
     }).compile();
 
     service = module.get<ConsentsService>(ConsentsService);
-    auditService = module.get<AuditService>(AuditService);
   });
 
   it('should be defined', () => {
@@ -59,7 +60,8 @@ describe('ConsentsService', () => {
           id: 'consent-1',
           legal_policy_id: 'policy-1',
           data_subject_id: 'user-1',
-          status: ConsentStatus.ACTIVE,
+          consent_request_id: 'request-1',
+          status: ConsentStatus.GRANTED,
           created_at: '2023-01-01T00:00:00Z',
           updated_at: '2023-01-01T00:00:00Z',
           expires_at: '2024-01-01T00:00:00Z',
@@ -70,13 +72,13 @@ describe('ConsentsService', () => {
       mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para devolver los datos
       const mockResponse = {
         data: mockConsents,
         error: null,
       };
-      
+
       // Usar una función para simular la resolución de la promesa
       const mockThen = jest.fn().mockResolvedValue(mockResponse);
       mockSupabaseClient.then = mockThen;
@@ -98,7 +100,8 @@ describe('ConsentsService', () => {
           id: 'consent-1',
           legal_policy_id: 'policy-1',
           data_subject_id: dataSubjectId,
-          status: ConsentStatus.ACTIVE,
+          consent_request_id: 'request-1',
+          status: ConsentStatus.GRANTED,
           created_at: '2023-01-01T00:00:00Z',
           updated_at: '2023-01-01T00:00:00Z',
           expires_at: '2024-01-01T00:00:00Z',
@@ -109,13 +112,13 @@ describe('ConsentsService', () => {
       mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para devolver los datos
       const mockResponse = {
         data: mockConsents,
         error: null,
       };
-      
+
       // Usar una función para simular la resolución de la promesa
       const mockThen = jest.fn().mockResolvedValue(mockResponse);
       mockSupabaseClient.then = mockThen;
@@ -126,7 +129,10 @@ describe('ConsentsService', () => {
       // Assert
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('consent');
       expect(mockSupabaseClient.select).toHaveBeenCalledWith('*');
-      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('data_subject_id', dataSubjectId);
+      expect(mockSupabaseClient.eq).toHaveBeenCalledWith(
+        'data_subject_id',
+        dataSubjectId,
+      );
       expect(result).toEqual(mockConsents);
     });
 
@@ -134,19 +140,21 @@ describe('ConsentsService', () => {
       // Arrange
       mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para devolver un error
       const mockResponse = {
         data: null,
         error: { message: 'Database error' },
       };
-      
+
       // Usar una función para simular la resolución de la promesa
       const mockThen = jest.fn().mockResolvedValue(mockResponse);
       mockSupabaseClient.then = mockThen;
 
       // Act & Assert
-      await expect(service.findAll()).rejects.toThrow('Error al obtener consentimientos: Database error');
+      await expect(service.findAll()).rejects.toThrow(
+        'Error al obtener consentimientos: Database error',
+      );
     });
   });
 
@@ -158,7 +166,8 @@ describe('ConsentsService', () => {
         id: consentId,
         legal_policy_id: 'policy-1',
         data_subject_id: 'user-1',
-        status: ConsentStatus.ACTIVE,
+        consent_request_id: 'request-1',
+        status: ConsentStatus.GRANTED,
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-01T00:00:00Z',
         expires_at: '2024-01-01T00:00:00Z',
@@ -168,7 +177,7 @@ describe('ConsentsService', () => {
       mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para el método single
       mockSupabaseClient.single = jest.fn().mockResolvedValue({
         data: mockConsent,
@@ -193,7 +202,7 @@ describe('ConsentsService', () => {
       mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para el método single
       mockSupabaseClient.single = jest.fn().mockResolvedValue({
         data: null,
@@ -201,7 +210,9 @@ describe('ConsentsService', () => {
       });
 
       // Act & Assert
-      await expect(service.findOne(consentId)).rejects.toThrow(NotFoundException);
+      await expect(service.findOne(consentId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -211,15 +222,17 @@ describe('ConsentsService', () => {
       const userId = 'user-1';
       const createConsentRequestDto: CreateConsentRequestDto = {
         legalPolicyId: 'policy-1',
-        dataSubjectId: 'user-2',
+        dataSubjectEmail: 'user2@example.com',
+        dataSubjectName: 'User Two',
+        dataTypeIds: ['datatype-1', 'datatype-2'],
         expiresAt: '2024-01-01T00:00:00Z',
       };
 
       const mockCreatedRequest: ConsentRequestDto = {
         id: 'request-1',
         legal_policy_id: createConsentRequestDto.legalPolicyId,
-        data_subject_id: createConsentRequestDto.dataSubjectId,
-        requested_by: userId,
+        data_subject_id: 'user-2',
+        company_id: 'company-1',
         status: 'PENDING',
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-01T00:00:00Z',
@@ -231,17 +244,16 @@ describe('ConsentsService', () => {
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.is.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para el método single
-      mockSupabaseClient.single = jest.fn()
-        .mockResolvedValueOnce({
-          data: { id: 'policy-1' },
-          error: null,
-        });
-      
+      mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
+        data: { id: 'policy-1' },
+        error: null,
+      });
+
       // Mock para insertar la solicitud
       mockSupabaseClient.insert.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para el método select después de insert
       const mockSelectAfterInsert = jest.fn().mockReturnValue({
         single: jest.fn().mockResolvedValue({
@@ -252,23 +264,31 @@ describe('ConsentsService', () => {
       mockSupabaseClient.select = mockSelectAfterInsert;
 
       // Act
-      const result = await service.createConsentRequest(createConsentRequestDto, userId);
+      const result = await service.createConsentRequest(
+        createConsentRequestDto,
+        userId,
+      );
 
       // Assert
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('legal_policy');
       expect(mockSupabaseClient.select).toHaveBeenCalledWith('*');
-      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('id', createConsentRequestDto.legalPolicyId);
+      expect(mockSupabaseClient.eq).toHaveBeenCalledWith(
+        'id',
+        createConsentRequestDto.legalPolicyId,
+      );
       expect(mockSupabaseClient.is).toHaveBeenCalledWith('valid_to', null);
-      
+
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('consent_request');
-      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(expect.objectContaining({
-        legal_policy_id: createConsentRequestDto.legalPolicyId,
-        data_subject_id: createConsentRequestDto.dataSubjectId,
-        requested_by: userId,
-        status: 'PENDING',
-        expires_at: createConsentRequestDto.expiresAt,
-      }));
-      
+      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          legal_policy_id: createConsentRequestDto.legalPolicyId,
+          data_subject_id: createConsentRequestDto.dataSubjectId,
+          requested_by: userId,
+          status: 'PENDING',
+          expires_at: createConsentRequestDto.expiresAt,
+        }),
+      );
+
       expect(result).toEqual(mockCreatedRequest);
       expect(mockAuditService.log).toHaveBeenCalled();
     });
@@ -278,7 +298,9 @@ describe('ConsentsService', () => {
       const userId = 'user-1';
       const createConsentRequestDto: CreateConsentRequestDto = {
         legalPolicyId: 'nonexistent-policy-id',
-        dataSubjectId: 'user-2',
+        dataSubjectEmail: 'user2@example.com',
+        dataSubjectName: 'User Two',
+        dataTypeIds: ['datatype-1', 'datatype-2'],
         expiresAt: '2024-01-01T00:00:00Z',
       };
 
@@ -287,17 +309,17 @@ describe('ConsentsService', () => {
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.is.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para el método single
-      mockSupabaseClient.single = jest.fn()
-        .mockResolvedValueOnce({
-          data: null,
-          error: { message: 'Policy not found' },
-        });
+      mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Policy not found' },
+      });
 
       // Act & Assert
-      await expect(service.createConsentRequest(createConsentRequestDto, userId))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        service.createConsentRequest(createConsentRequestDto, userId),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -327,11 +349,12 @@ describe('ConsentsService', () => {
         updated_at: '2023-01-02T00:00:00Z',
       };
 
-      const mockCreatedConsent: ConsentDto = {
+      const mockConsent: ConsentDto = {
         id: 'consent-1',
         legal_policy_id: mockRequest.legal_policy_id,
         data_subject_id: mockRequest.data_subject_id,
-        status: ConsentStatus.ACTIVE,
+        consent_request_id: 'request-1',
+        status: ConsentStatus.GRANTED,
         created_at: '2023-01-02T00:00:00Z',
         updated_at: '2023-01-02T00:00:00Z',
         expires_at: mockRequest.expires_at,
@@ -341,55 +364,64 @@ describe('ConsentsService', () => {
       mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para el método single
-      mockSupabaseClient.single = jest.fn()
+      mockSupabaseClient.single = jest
+        .fn()
         .mockResolvedValueOnce({
           data: mockRequest,
           error: null,
         })
         .mockResolvedValueOnce({
-          data: mockCreatedConsent,
+          data: mockConsent,
           error: null,
         });
-      
+
       // Mock para actualizar la solicitud
       mockSupabaseClient.update.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para el método then después de update
       const mockThenAfterUpdate = jest.fn().mockResolvedValue({
         data: { id: requestId },
         error: null,
       });
       mockSupabaseClient.then = mockThenAfterUpdate;
-      
+
       // Mock para insertar el consentimiento
       mockSupabaseClient.insert.mockReturnValue(mockSupabaseClient);
 
       // Act
-      const result = await service.respondToConsentRequest(requestId, respondDto, userId);
+      const result = await service.respondToConsentRequest(
+        requestId,
+        respondDto,
+        userId,
+      );
 
       // Assert
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('consent_request');
       expect(mockSupabaseClient.select).toHaveBeenCalledWith('*');
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('id', requestId);
-      
-      expect(mockSupabaseClient.update).toHaveBeenCalledWith(expect.objectContaining({
-        status: 'ACCEPTED',
-        updated_at: expect.any(String),
-      }));
-      
+
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'ACCEPTED',
+          updated_at: expect.any(String),
+        }),
+      );
+
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('consent');
-      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(expect.objectContaining({
-        legal_policy_id: mockRequest.legal_policy_id,
-        data_subject_id: mockRequest.data_subject_id,
-        status: ConsentStatus.ACTIVE,
-        expires_at: mockRequest.expires_at,
-      }));
-      
+      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          legal_policy_id: mockRequest.legal_policy_id,
+          data_subject_id: mockRequest.data_subject_id,
+          status: ConsentStatus.GRANTED,
+          expires_at: mockRequest.expires_at,
+        }),
+      );
+
       expect(result).toEqual({
         request: mockUpdatedRequest,
-        consent: mockCreatedConsent,
+        consent: mockConsent,
       });
       expect(mockAuditService.log).toHaveBeenCalled();
     });
@@ -423,17 +455,16 @@ describe('ConsentsService', () => {
       mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para el método single
-      mockSupabaseClient.single = jest.fn()
-        .mockResolvedValueOnce({
-          data: mockRequest,
-          error: null,
-        });
-      
+      mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
+        data: mockRequest,
+        error: null,
+      });
+
       // Mock para actualizar la solicitud
       mockSupabaseClient.update.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para el método then después de update
       const mockThenAfterUpdate = jest.fn().mockResolvedValue({
         data: { id: requestId },
@@ -442,18 +473,24 @@ describe('ConsentsService', () => {
       mockSupabaseClient.then = mockThenAfterUpdate;
 
       // Act
-      const result = await service.respondToConsentRequest(requestId, respondDto, userId);
+      const result = await service.respondToConsentRequest(
+        requestId,
+        respondDto,
+        userId,
+      );
 
       // Assert
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('consent_request');
       expect(mockSupabaseClient.select).toHaveBeenCalledWith('*');
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('id', requestId);
-      
-      expect(mockSupabaseClient.update).toHaveBeenCalledWith(expect.objectContaining({
-        status: 'REJECTED',
-        updated_at: expect.any(String),
-      }));
-      
+
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'REJECTED',
+          updated_at: expect.any(String),
+        }),
+      );
+
       expect(result).toEqual({
         request: mockUpdatedRequest,
         consent: null,
@@ -473,17 +510,17 @@ describe('ConsentsService', () => {
       mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para el método single
-      mockSupabaseClient.single = jest.fn()
-        .mockResolvedValueOnce({
-          data: null,
-          error: { message: 'Request not found' },
-        });
+      mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Request not found' },
+      });
 
       // Act & Assert
-      await expect(service.respondToConsentRequest(requestId, respondDto, userId))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        service.respondToConsentRequest(requestId, respondDto, userId),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BadRequestException when user is not the data subject', async () => {
@@ -509,17 +546,17 @@ describe('ConsentsService', () => {
       mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para el método single
-      mockSupabaseClient.single = jest.fn()
-        .mockResolvedValueOnce({
-          data: mockRequest,
-          error: null,
-        });
+      mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
+        data: mockRequest,
+        error: null,
+      });
 
       // Act & Assert
-      await expect(service.respondToConsentRequest(requestId, respondDto, userId))
-        .rejects.toThrow(BadRequestException);
+      await expect(
+        service.respondToConsentRequest(requestId, respondDto, userId),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException when request is not pending', async () => {
@@ -545,17 +582,17 @@ describe('ConsentsService', () => {
       mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para el método single
-      mockSupabaseClient.single = jest.fn()
-        .mockResolvedValueOnce({
-          data: mockRequest,
-          error: null,
-        });
+      mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
+        data: mockRequest,
+        error: null,
+      });
 
       // Act & Assert
-      await expect(service.respondToConsentRequest(requestId, respondDto, userId))
-        .rejects.toThrow(BadRequestException);
+      await expect(
+        service.respondToConsentRequest(requestId, respondDto, userId),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -572,7 +609,8 @@ describe('ConsentsService', () => {
         id: consentId,
         legal_policy_id: 'policy-1',
         data_subject_id: userId,
-        status: ConsentStatus.ACTIVE,
+        consent_request_id: 'request-1',
+        status: ConsentStatus.GRANTED,
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-01T00:00:00Z',
         expires_at: '2024-01-01T00:00:00Z',
@@ -588,9 +626,10 @@ describe('ConsentsService', () => {
       mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para el método single
-      mockSupabaseClient.single = jest.fn()
+      mockSupabaseClient.single = jest
+        .fn()
         .mockResolvedValueOnce({
           data: mockConsent,
           error: null,
@@ -599,23 +638,29 @@ describe('ConsentsService', () => {
           data: mockUpdatedConsent,
           error: null,
         });
-      
+
       // Mock para actualizar el consentimiento
       mockSupabaseClient.update.mockReturnValue(mockSupabaseClient);
 
       // Act
-      const result = await service.updateConsentStatus(consentId, updateDto, userId);
+      const result = await service.updateConsentStatus(
+        consentId,
+        updateDto,
+        userId,
+      );
 
       // Assert
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('consent');
       expect(mockSupabaseClient.select).toHaveBeenCalledWith('*');
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('id', consentId);
-      
-      expect(mockSupabaseClient.update).toHaveBeenCalledWith(expect.objectContaining({
-        status: ConsentStatus.REVOKED,
-        updated_at: expect.any(String),
-      }));
-      
+
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: ConsentStatus.REVOKED,
+          updated_at: expect.any(String),
+        }),
+      );
+
       expect(result).toEqual(mockUpdatedConsent);
       expect(mockAuditService.log).toHaveBeenCalled();
     });
@@ -632,17 +677,17 @@ describe('ConsentsService', () => {
       mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para el método single
-      mockSupabaseClient.single = jest.fn()
-        .mockResolvedValueOnce({
-          data: null,
-          error: { message: 'Consent not found' },
-        });
+      mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Consent not found' },
+      });
 
       // Act & Assert
-      await expect(service.updateConsentStatus(consentId, updateDto, userId))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateConsentStatus(consentId, updateDto, userId),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BadRequestException when user is not the data subject', async () => {
@@ -657,7 +702,8 @@ describe('ConsentsService', () => {
         id: consentId,
         legal_policy_id: 'policy-1',
         data_subject_id: 'user-1', // Different from userId
-        status: ConsentStatus.ACTIVE,
+        consent_request_id: 'request-1',
+        status: ConsentStatus.GRANTED,
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-01T00:00:00Z',
         expires_at: '2024-01-01T00:00:00Z',
@@ -667,17 +713,17 @@ describe('ConsentsService', () => {
       mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
       mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
-      
+
       // Configurar el mock para el método single
-      mockSupabaseClient.single = jest.fn()
-        .mockResolvedValueOnce({
-          data: mockConsent,
-          error: null,
-        });
+      mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
+        data: mockConsent,
+        error: null,
+      });
 
       // Act & Assert
-      await expect(service.updateConsentStatus(consentId, updateDto, userId))
-        .rejects.toThrow(BadRequestException);
+      await expect(
+        service.updateConsentStatus(consentId, updateDto, userId),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

@@ -57,4 +57,10 @@ export class ConsentDto {
    * @example "2023-01-01T00:00:00.000Z"
    */
   updated_at: string;
-} 
+
+  /**
+   * Fecha de expiración del consentimiento (si aplica)
+   * @example "2024-01-01T00:00:00.000Z"
+   */
+  expires_at?: string;
+}

@@ -1,24 +1,25 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConsentsController } from './consents.controller';
 import { ConsentsService } from './consents.service';
-import { 
-  ConsentDto, 
-  ConsentRequestDto, 
-  CreateConsentRequestDto, 
+import {
+  ConsentDto,
+  ConsentRequestDto,
+  CreateConsentRequestDto,
   RespondConsentRequestDto,
   UpdateConsentStatusDto,
-  ConsentStatus
+  ConsentStatus,
+  ConsentResponseType,
 } from './dto';
-import { JwtAuthGuard } from '../auth/jwt/jwt.guard';
+import { JwtGuard } from '../auth/jwt/jwt.guard';
 import { Request } from 'express';
 
 // Mock del servicio de consentimientos
 const mockConsentsService = {
   findAll: jest.fn(),
   findOne: jest.fn(),
-  createConsentRequest: jest.fn(),
-  respondToConsentRequest: jest.fn(),
-  updateConsentStatus: jest.fn(),
+  createRequest: jest.fn(),
+  respondToRequest: jest.fn(),
+  updateStatus: jest.fn(),
 };
 
 // Mock del guard de autenticación
@@ -31,7 +32,7 @@ describe('ConsentsController', () => {
   beforeEach(async () => {
     // Resetear todos los mocks antes de cada prueba
     jest.clearAllMocks();
-    
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ConsentsController],
       providers: [
@@ -41,9 +42,9 @@ describe('ConsentsController', () => {
         },
       ],
     })
-    .overrideGuard(JwtAuthGuard)
-    .useValue(mockJwtAuthGuard)
-    .compile();
+      .overrideGuard(JwtGuard)
+      .useValue(mockJwtAuthGuard)
+      .compile();
 
     controller = module.get<ConsentsController>(ConsentsController);
     service = module.get<ConsentsService>(ConsentsService);
@@ -61,13 +62,14 @@ describe('ConsentsController', () => {
           id: 'consent-1',
           legal_policy_id: 'policy-1',
           data_subject_id: 'user-1',
-          status: 'ACTIVE',
+          consent_request_id: 'request-1',
+          status: ConsentStatus.GRANTED,
           created_at: '2023-01-01T00:00:00Z',
           updated_at: '2023-01-01T00:00:00Z',
           expires_at: '2024-01-01T00:00:00Z',
         },
       ];
-      
+
       mockConsentsService.findAll.mockResolvedValue(mockConsents);
 
       // Act
@@ -86,13 +88,14 @@ describe('ConsentsController', () => {
           id: 'consent-1',
           legal_policy_id: legalPolicyId,
           data_subject_id: 'user-1',
-          status: 'ACTIVE',
+          consent_request_id: 'request-1',
+          status: ConsentStatus.GRANTED,
           created_at: '2023-01-01T00:00:00Z',
           updated_at: '2023-01-01T00:00:00Z',
           expires_at: '2024-01-01T00:00:00Z',
         },
       ];
-      
+
       mockConsentsService.findAll.mockResolvedValue(mockConsents);
 
       // Act
@@ -111,13 +114,14 @@ describe('ConsentsController', () => {
           id: 'consent-1',
           legal_policy_id: 'policy-1',
           data_subject_id: dataSubjectId,
-          status: 'ACTIVE',
+          consent_request_id: 'request-1',
+          status: ConsentStatus.GRANTED,
           created_at: '2023-01-01T00:00:00Z',
           updated_at: '2023-01-01T00:00:00Z',
           expires_at: '2024-01-01T00:00:00Z',
         },
       ];
-      
+
       mockConsentsService.findAll.mockResolvedValue(mockConsents);
 
       // Act
@@ -137,12 +141,13 @@ describe('ConsentsController', () => {
         id: consentId,
         legal_policy_id: 'policy-1',
         data_subject_id: 'user-1',
-        status: 'ACTIVE',
+        consent_request_id: 'request-1',
+        status: ConsentStatus.GRANTED,
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-01T00:00:00Z',
         expires_at: '2024-01-01T00:00:00Z',
       };
-      
+
       mockConsentsService.findOne.mockResolvedValue(mockConsent);
 
       // Act
@@ -160,33 +165,41 @@ describe('ConsentsController', () => {
       const userId = 'user-1';
       const createConsentRequestDto: CreateConsentRequestDto = {
         legalPolicyId: 'policy-1',
-        dataSubjectId: 'user-2',
+        dataSubjectEmail: 'user2@example.com',
+        dataSubjectName: 'User Two',
+        dataTypeIds: ['datatype-1', 'datatype-2'],
         expiresAt: '2024-01-01T00:00:00Z',
       };
-      
+
       const mockRequest: ConsentRequestDto = {
         id: 'request-1',
         legal_policy_id: createConsentRequestDto.legalPolicyId,
-        data_subject_id: createConsentRequestDto.dataSubjectId,
-        requested_by: userId,
+        data_subject_id: 'user-2',
+        company_id: 'company-1',
         status: 'PENDING',
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-01T00:00:00Z',
         expires_at: createConsentRequestDto.expiresAt,
       };
-      
-      mockConsentsService.createConsentRequest.mockResolvedValue(mockRequest);
-      
+
+      mockConsentsService.createRequest.mockResolvedValue(mockRequest);
+
       // Mock de la solicitud con el usuario autenticado
       const mockRequest1 = {
         user: { id: userId },
       } as unknown as Request;
 
       // Act
-      const result = await controller.createConsentRequest(createConsentRequestDto, mockRequest1);
+      const result = await controller.createRequest(
+        createConsentRequestDto,
+        mockRequest1,
+      );
 
       // Assert
-      expect(service.createConsentRequest).toHaveBeenCalledWith(createConsentRequestDto, userId);
+      expect(service.createRequest).toHaveBeenCalledWith(
+        createConsentRequestDto,
+        userId,
+      );
       expect(result).toEqual(mockRequest);
     });
   });
@@ -197,9 +210,10 @@ describe('ConsentsController', () => {
       const requestId = 'request-1';
       const userId = 'user-2';
       const respondDto: RespondConsentRequestDto = {
-        response: 'ACCEPT',
+        accepted: true,
+        response: ConsentResponseType.ACCEPT,
       };
-      
+
       const mockResponse = {
         request: {
           id: requestId,
@@ -215,25 +229,33 @@ describe('ConsentsController', () => {
           id: 'consent-1',
           legal_policy_id: 'policy-1',
           data_subject_id: userId,
-          status: 'ACTIVE',
+          status: ConsentStatus.GRANTED,
           created_at: '2023-01-02T00:00:00Z',
           updated_at: '2023-01-02T00:00:00Z',
           expires_at: '2024-01-01T00:00:00Z',
         },
       };
-      
-      mockConsentsService.respondToConsentRequest.mockResolvedValue(mockResponse);
-      
+
+      mockConsentsService.respondToRequest.mockResolvedValue(mockResponse);
+
       // Mock de la solicitud con el usuario autenticado
       const mockRequest1 = {
         user: { id: userId },
       } as unknown as Request;
 
       // Act
-      const result = await controller.respondToConsentRequest(requestId, respondDto, mockRequest1);
+      const result = await controller.respondToRequest(
+        requestId,
+        respondDto,
+        mockRequest1,
+      );
 
       // Assert
-      expect(service.respondToConsentRequest).toHaveBeenCalledWith(requestId, respondDto, userId);
+      expect(service.respondToRequest).toHaveBeenCalledWith(
+        requestId,
+        respondDto,
+        userId,
+      );
       expect(result).toEqual(mockResponse);
     });
   });
@@ -244,31 +266,40 @@ describe('ConsentsController', () => {
       const consentId = 'consent-1';
       const userId = 'user-1';
       const updateDto: UpdateConsentStatusDto = {
-        status: 'REVOKED',
+        status: ConsentStatus.REVOKED,
       };
-      
+
       const mockUpdatedConsent: ConsentDto = {
         id: consentId,
         legal_policy_id: 'policy-1',
         data_subject_id: userId,
-        status: 'REVOKED',
+        consent_request_id: 'request-1',
+        status: ConsentStatus.GRANTED,
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-02T00:00:00Z',
         expires_at: '2024-01-01T00:00:00Z',
       };
-      
-      mockConsentsService.updateConsentStatus.mockResolvedValue(mockUpdatedConsent);
-      
+
+      mockConsentsService.updateStatus.mockResolvedValue(mockUpdatedConsent);
+
       // Mock de la solicitud con el usuario autenticado
       const mockRequest1 = {
         user: { id: userId },
       } as unknown as Request;
 
       // Act
-      const result = await controller.updateConsentStatus(consentId, updateDto, mockRequest1);
+      const result = await controller.updateStatus(
+        consentId,
+        updateDto,
+        mockRequest1,
+      );
 
       // Assert
-      expect(service.updateConsentStatus).toHaveBeenCalledWith(consentId, updateDto, userId);
+      expect(service.updateStatus).toHaveBeenCalledWith(
+        consentId,
+        updateDto,
+        userId,
+      );
       expect(result).toEqual(mockUpdatedConsent);
     });
   });

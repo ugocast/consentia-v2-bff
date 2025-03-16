@@ -1,4 +1,9 @@
-import { Injectable, ExecutionContext, UnauthorizedException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  ExecutionContext,
+  UnauthorizedException,
+  Logger,
+} from '@nestjs/common';
 import { createSupabaseClient } from '../../config/supabase.config';
 
 @Injectable()
@@ -12,7 +17,9 @@ export class JwtAuthGuard {
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       this.logger.warn('Token de autenticación no proporcionado');
-      throw new UnauthorizedException('Token de autenticación no proporcionado');
+      throw new UnauthorizedException(
+        'Token de autenticación no proporcionado',
+      );
     }
 
     const token = authHeader.replace('Bearer ', '');
@@ -30,11 +37,11 @@ export class JwtAuthGuard {
       // Añadir el usuario a la solicitud para que esté disponible en los controladores
       request.user = data.user;
       this.logger.debug(`Usuario autenticado: ${data.user.id}`);
-      
+
       return true;
     } catch (error) {
       this.logger.error(`Error al verificar token: ${error.message}`);
       throw new UnauthorizedException('Token inválido o expirado');
     }
   }
-} 
+}

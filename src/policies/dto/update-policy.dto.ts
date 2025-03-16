@@ -27,4 +27,4 @@ export class UpdatePolicyDto {
   @IsArray()
   @IsOptional()
   dataTypes?: string[];
-} 
+}

@@ -2,8 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { UpdateUserDto, UserDto } from './dto/user.dto';
-import { ExecutionContext } from '@nestjs/common';
-import { User } from './decorators/user.decorator';
 
 // Mock del servicio de usuarios
 const mockUsersService = {
@@ -27,7 +25,7 @@ describe('UsersController', () => {
   beforeEach(async () => {
     // Resetear todos los mocks antes de cada prueba
     jest.clearAllMocks();
-    
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
       providers: [
@@ -56,7 +54,7 @@ describe('UsersController', () => {
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-01T00:00:00Z',
       };
-      
+
       mockUsersService.getCurrentUser.mockResolvedValue(mockUser);
 
       // Sobrescribir el método para la prueba
@@ -84,7 +82,7 @@ describe('UsersController', () => {
       const updateUserDto: UpdateUserDto = {
         name: 'Updated Name',
       };
-      
+
       const mockUpdatedUser: UserDto = {
         id: userId,
         email: 'test@example.com',
@@ -92,7 +90,7 @@ describe('UsersController', () => {
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-02T00:00:00Z',
       };
-      
+
       mockUsersService.updateUser.mockResolvedValue(mockUpdatedUser);
 
       // Sobrescribir el método para la prueba
@@ -105,7 +103,10 @@ describe('UsersController', () => {
       const result = await controller.updateUser(userId, updateUserDto);
 
       // Assert
-      expect(mockUsersService.updateUser).toHaveBeenCalledWith(userId, updateUserDto);
+      expect(mockUsersService.updateUser).toHaveBeenCalledWith(
+        userId,
+        updateUserDto,
+      );
       expect(result).toEqual(mockUpdatedUser);
 
       // Restaurar el método original
@@ -118,7 +119,7 @@ describe('UsersController', () => {
       // Arrange
       const userId = 'user-id';
       const mockResult = { success: true };
-      
+
       mockUsersService.deleteUser.mockResolvedValue(mockResult);
 
       // Sobrescribir el método para la prueba

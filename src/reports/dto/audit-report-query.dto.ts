@@ -1,4 +1,12 @@
-import { IsOptional, IsUUID, IsEnum, IsDateString, IsInt, Min, Max } from 'class-validator';
+import {
+  IsOptional,
+  IsUUID,
+  IsEnum,
+  IsDateString,
+  IsInt,
+  Min,
+  Max,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { AuditAction, ResourceType } from '../../common/audit/audit.service';
 
@@ -82,4 +90,4 @@ export class AuditReportQueryDto {
   @IsOptional()
   @Type(() => Number)
   pageSize?: number = 10;
-} 
+}

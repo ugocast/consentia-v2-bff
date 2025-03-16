@@ -58,13 +58,15 @@ export class ConsentDto {
 export class ConsentReportResultDto {
   @ApiProperty({
     type: [ConsentDto],
-    description: 'Lista de consentimientos que coinciden con los criterios de búsqueda',
+    description:
+      'Lista de consentimientos que coinciden con los criterios de búsqueda',
   })
   items: ConsentDto[];
 
   @ApiProperty({
     example: 100,
-    description: 'Número total de consentimientos que coinciden con los criterios',
+    description:
+      'Número total de consentimientos que coinciden con los criterios',
   })
   total: number;
 
@@ -85,4 +87,4 @@ export class ConsentReportResultDto {
     description: 'Número total de páginas',
   })
   totalPages: number;
-} 
+}

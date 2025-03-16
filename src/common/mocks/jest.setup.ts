@@ -19,4 +19,4 @@ process.env = {
   SUPABASE_SERVICE_KEY: 'test-service-key',
   JWT_SECRET: 'test-jwt-secret',
   FRONTEND_URL: 'http://localhost:3001',
-}; 
+};

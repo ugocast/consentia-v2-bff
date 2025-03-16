@@ -19,7 +19,9 @@ describe('AppController (e2e)', () => {
     return request(app.getHttpServer())
       .get('/')
       .expect(200)
-      .expect('¡Hola Mundo desde Consentia BFF v1.0.0! Este es un Backend for Frontend construido con NestJS.');
+      .expect(
+        '¡Hola Mundo desde Consentia BFF v1.0.0! Este es un Backend for Frontend construido con NestJS.',
+      );
   });
 
   afterAll(async () => {

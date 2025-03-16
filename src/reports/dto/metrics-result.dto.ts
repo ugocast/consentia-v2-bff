@@ -87,4 +87,4 @@ export class MetricsResultDto {
      */
     revocationRate: number;
   };
-} 
+}

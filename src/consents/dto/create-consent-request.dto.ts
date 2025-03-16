@@ -1,4 +1,12 @@
-import { IsString, IsNotEmpty, IsUUID, IsArray, IsOptional, IsEmail } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsUUID,
+  IsArray,
+  IsOptional,
+  IsEmail,
+  IsDateString,
+} from 'class-validator';
 
 /**
  * DTO para la creación de solicitudes de consentimiento
@@ -38,9 +46,17 @@ export class CreateConsentRequestDto {
   dataTypeIds: string[];
 
   /**
+   * Fecha de expiración del consentimiento
+   * @example "2024-01-01T00:00:00.000Z"
+   */
+  @IsDateString()
+  @IsOptional()
+  expiresAt?: string;
+
+  /**
    * Metadatos adicionales para la solicitud
    * @example { "source": "formulario_web", "campaign": "promo_verano" }
    */
   @IsOptional()
   metadata?: Record<string, any>;
-} 
+}

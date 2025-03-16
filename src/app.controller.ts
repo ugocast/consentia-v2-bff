@@ -31,7 +31,7 @@ export class AppController {
         'Consents - Gestión de consentimientos',
         'Reports - Generación de reportes',
       ],
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 

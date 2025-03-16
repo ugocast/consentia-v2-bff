@@ -19,7 +19,10 @@ export class AuditController {
   @ApiQuery({ name: 'endDate', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'pageSize', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Logs de auditoría obtenidos correctamente' })
+  @ApiResponse({
+    status: 200,
+    description: 'Logs de auditoría obtenidos correctamente',
+  })
   async getAuditLogs(
     @Query('userId') userId?: string,
     @Query('resourceType') resourceType?: ResourceType,
@@ -45,4 +48,4 @@ export class AuditController {
       parseInt(pageSize, 10),
     );
   }
-} 
+}

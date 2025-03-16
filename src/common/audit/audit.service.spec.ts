@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuditService, AuditAction, ResourceType, AuditLogEntry } from './audit.service';
+import {
+  AuditService,
+  AuditAction,
+  ResourceType,
+  AuditLogEntry,
+} from './audit.service';
 
 // Mock para Supabase
 const mockSupabaseInsert = jest.fn();
@@ -44,7 +49,7 @@ describe('AuditService', () => {
   beforeEach(async () => {
     // Resetear todos los mocks antes de cada prueba
     jest.clearAllMocks();
-    
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [AuditService],
     }).compile();
@@ -68,7 +73,10 @@ describe('AuditService', () => {
       };
 
       // Configurar el mock para devolver una respuesta exitosa
-      mockSupabaseInsert.mockResolvedValue({ data: { id: 'audit-1' }, error: null });
+      mockSupabaseInsert.mockResolvedValue({
+        data: { id: 'audit-1' },
+        error: null,
+      });
 
       // Act
       await service.log(auditEntry);
@@ -98,7 +106,10 @@ describe('AuditService', () => {
       };
 
       // Configurar el mock para devolver una respuesta exitosa
-      mockSupabaseInsert.mockResolvedValue({ data: { id: 'audit-1' }, error: null });
+      mockSupabaseInsert.mockResolvedValue({
+        data: { id: 'audit-1' },
+        error: null,
+      });
 
       // Act
       await service.log(auditEntry);
@@ -127,7 +138,10 @@ describe('AuditService', () => {
       };
 
       // Configurar el mock para devolver un error
-      mockSupabaseInsert.mockResolvedValue({ data: null, error: { message: 'Database error' } });
+      mockSupabaseInsert.mockResolvedValue({
+        data: null,
+        error: { message: 'Database error' },
+      });
 
       // Espiar el método logger.error
       const loggerSpy = jest.spyOn(service['logger'], 'error');
@@ -138,7 +152,7 @@ describe('AuditService', () => {
       // Assert
       expect(loggerSpy).toHaveBeenCalledWith(
         'Error al registrar en el log de auditoría: Database error',
-        expect.anything()
+        expect.anything(),
       );
     });
   });
@@ -177,7 +191,11 @@ describe('AuditService', () => {
       ];
 
       // Configurar el mock para devolver los logs
-      mockSupabaseRange.mockResolvedValue({ data: mockLogs, error: null, count: 2 });
+      mockSupabaseRange.mockResolvedValue({
+        data: mockLogs,
+        error: null,
+        count: 2,
+      });
 
       // Act
       const result = await service.getAuditLogs(filters, page, pageSize);
@@ -186,15 +204,26 @@ describe('AuditService', () => {
       expect(mockSupabaseFrom).toHaveBeenCalledWith('audit_log');
       expect(mockSupabaseSelect).toHaveBeenCalledWith('*', { count: 'exact' });
       expect(mockSupabaseEq).toHaveBeenCalledWith('user_id', filters.userId);
-      expect(mockSupabaseEq).toHaveBeenCalledWith('resource_type', filters.resourceType);
-      expect(mockSupabaseGte).toHaveBeenCalledWith('created_at', filters.startDate);
-      expect(mockSupabaseLte).toHaveBeenCalledWith('created_at', filters.endDate);
-      expect(mockSupabaseOrder).toHaveBeenCalledWith('created_at', { ascending: false });
+      expect(mockSupabaseEq).toHaveBeenCalledWith(
+        'resource_type',
+        filters.resourceType,
+      );
+      expect(mockSupabaseGte).toHaveBeenCalledWith(
+        'created_at',
+        filters.startDate,
+      );
+      expect(mockSupabaseLte).toHaveBeenCalledWith(
+        'created_at',
+        filters.endDate,
+      );
+      expect(mockSupabaseOrder).toHaveBeenCalledWith('created_at', {
+        ascending: false,
+      });
       expect(mockSupabaseRange).toHaveBeenCalledWith(
         (page - 1) * pageSize,
-        (page - 1) * pageSize + pageSize - 1
+        (page - 1) * pageSize + pageSize - 1,
       );
-      
+
       expect(result.items).toEqual(mockLogs);
       expect(result.total).toBe(2);
     });
@@ -208,11 +237,16 @@ describe('AuditService', () => {
       const pageSize = 10;
 
       // Configurar el mock para devolver un error
-      mockSupabaseRange.mockResolvedValue({ data: null, error: { message: 'Database error' }, count: 0 });
+      mockSupabaseRange.mockResolvedValue({
+        data: null,
+        error: { message: 'Database error' },
+        count: 0,
+      });
 
       // Act & Assert
-      await expect(service.getAuditLogs(filters, page, pageSize))
-        .rejects.toThrow('Error al obtener logs de auditoría: Database error');
+      await expect(
+        service.getAuditLogs(filters, page, pageSize),
+      ).rejects.toThrow('Error al obtener logs de auditoría: Database error');
     });
   });
 });

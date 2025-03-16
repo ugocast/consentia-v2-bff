@@ -96,4 +96,4 @@ export class AuditReportResultDto {
    * @example 10
    */
   totalPages: number;
-} 
+}

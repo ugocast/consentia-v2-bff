@@ -30,7 +30,7 @@ export class TransformInterceptor<T>
   ): Observable<Response<T>> {
     const request = context.switchToHttp().getRequest();
     const response = context.switchToHttp().getResponse();
-    
+
     return next.handle().pipe(
       map((data) => ({
         data,
@@ -40,4 +40,4 @@ export class TransformInterceptor<T>
       })),
     );
   }
-} 
+}

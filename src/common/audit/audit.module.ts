@@ -9,4 +9,4 @@ import { AuthModule } from '../../auth/auth.module';
   controllers: [AuditController],
   exports: [AuditService],
 })
-export class AuditModule {} 
+export class AuditModule {}

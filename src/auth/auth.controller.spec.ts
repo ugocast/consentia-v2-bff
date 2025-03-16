@@ -1,7 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto, ResetPasswordDto, UpdatePasswordDto } from './dto/auth.dto';
+import {
+  LoginDto,
+  RegisterDto,
+  ResetPasswordDto,
+  UpdatePasswordDto,
+} from './dto/auth.dto';
 
 // Mock del servicio de autenticación
 const mockAuthService = {
@@ -20,7 +25,7 @@ describe('AuthController', () => {
   beforeEach(async () => {
     // Resetear todos los mocks antes de cada prueba
     jest.clearAllMocks();
-    
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
@@ -46,7 +51,7 @@ describe('AuthController', () => {
         password: 'Password123!',
         name: 'Test User',
       };
-      
+
       const mockResult = {
         user: {
           id: 'user-id',
@@ -57,7 +62,7 @@ describe('AuthController', () => {
           refresh_token: 'refresh-token',
         },
       };
-      
+
       mockAuthService.register.mockResolvedValue(mockResult);
 
       // Act
@@ -76,7 +81,7 @@ describe('AuthController', () => {
         email: 'test@example.com',
         password: 'Password123!',
       };
-      
+
       const mockResult = {
         user: {
           id: 'user-id',
@@ -87,7 +92,7 @@ describe('AuthController', () => {
           refresh_token: 'refresh-token',
         },
       };
-      
+
       mockAuthService.login.mockResolvedValue(mockResult);
 
       // Act
@@ -104,7 +109,7 @@ describe('AuthController', () => {
       // Arrange
       const authorization = 'Bearer access-token';
       const mockResult = { success: true };
-      
+
       mockAuthService.logout.mockResolvedValue(mockResult);
 
       // Sobrescribir el método para la prueba
@@ -132,19 +137,21 @@ describe('AuthController', () => {
       const resetPasswordDto: ResetPasswordDto = {
         email: 'test@example.com',
       };
-      
+
       const mockResult = {
         success: true,
         message: 'Se ha enviado un correo para restablecer la contraseña',
       };
-      
+
       mockAuthService.resetPassword.mockResolvedValue(mockResult);
 
       // Act
       const result = await controller.resetPassword(resetPasswordDto);
 
       // Assert
-      expect(mockAuthService.resetPassword).toHaveBeenCalledWith(resetPasswordDto);
+      expect(mockAuthService.resetPassword).toHaveBeenCalledWith(
+        resetPasswordDto,
+      );
       expect(result).toEqual(mockResult);
     });
   });
@@ -155,28 +162,37 @@ describe('AuthController', () => {
       const updatePasswordDto: UpdatePasswordDto = {
         password: 'NewPassword123!',
       };
-      
+
       const authorization = 'Bearer access-token';
-      
+
       const mockResult = {
         success: true,
         message: 'Contraseña actualizada correctamente',
       };
-      
+
       mockAuthService.updatePassword.mockResolvedValue(mockResult);
 
       // Sobrescribir el método para la prueba
       const originalMethod = controller.updatePassword;
-      controller.updatePassword = async (auth: string, dto: UpdatePasswordDto) => {
+      controller.updatePassword = async (
+        auth: string,
+        dto: UpdatePasswordDto,
+      ) => {
         const token = auth.replace('Bearer ', '');
         return mockAuthService.updatePassword(token, dto);
       };
 
       // Act
-      const result = await controller.updatePassword(authorization, updatePasswordDto);
+      const result = await controller.updatePassword(
+        authorization,
+        updatePasswordDto,
+      );
 
       // Assert
-      expect(mockAuthService.updatePassword).toHaveBeenCalledWith('access-token', updatePasswordDto);
+      expect(mockAuthService.updatePassword).toHaveBeenCalledWith(
+        'access-token',
+        updatePasswordDto,
+      );
       expect(result).toEqual(mockResult);
 
       // Restaurar el método original
@@ -190,7 +206,7 @@ describe('AuthController', () => {
       const refreshTokenDto = {
         refresh_token: 'refresh-token',
       };
-      
+
       const mockResult = {
         user: {
           id: 'user-id',
@@ -201,14 +217,16 @@ describe('AuthController', () => {
           refresh_token: 'new-refresh-token',
         },
       };
-      
+
       mockAuthService.refreshToken.mockResolvedValue(mockResult);
 
       // Act
       const result = await controller.refreshToken(refreshTokenDto);
 
       // Assert
-      expect(mockAuthService.refreshToken).toHaveBeenCalledWith(refreshTokenDto.refresh_token);
+      expect(mockAuthService.refreshToken).toHaveBeenCalledWith(
+        refreshTokenDto.refresh_token,
+      );
       expect(result).toEqual(mockResult);
     });
   });
