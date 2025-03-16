@@ -1,0 +1,444 @@
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { createSupabaseClient } from '../config/supabase.config';
+import { AuditService, AuditAction, ResourceType } from '../common/audit/audit.service';
+import {
+  CreateConsentRequestDto,
+  RespondConsentRequestDto,
+  UpdateConsentStatusDto,
+  ConsentDto,
+  ConsentRequestDto,
+  ConsentWithDetailsDto,
+  ConsentStatus,
+} from './dto';
+
+@Injectable()
+export class ConsentsService {
+  private readonly logger = new Logger(ConsentsService.name);
+  private supabase = createSupabaseClient({ useServiceKey: true });
+
+  constructor(private readonly auditService: AuditService) {}
+
+  /**
+   * Obtiene todos los consentimientos con filtros opcionales
+   */
+  async findAll(
+    companyId?: string,
+    dataSubjectId?: string,
+    status?: ConsentStatus,
+  ): Promise<ConsentDto[]> {
+    try {
+      let query = this.supabase.from('consent').select('*');
+
+      // Aplicar filtros si se proporcionan
+      if (companyId) {
+        // Para filtrar por compañía, necesitamos unir con la tabla legal_policy
+        query = this.supabase
+          .from('consent')
+          .select('*, legal_policy!inner(*)')
+          .eq('legal_policy.company_id', companyId);
+      }
+
+      if (dataSubjectId) {
+        query = query.eq('data_subject_id', dataSubjectId);
+      }
+
+      if (status) {
+        query = query.eq('status', status);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        this.logger.error(`Error al obtener consentimientos: ${error.message}`, error);
+        throw new Error(`Error al obtener consentimientos: ${error.message}`);
+      }
+
+      // Si filtramos por compañía, necesitamos limpiar los datos para devolver solo los consentimientos
+      if (companyId) {
+        return data.map((item) => {
+          const { legal_policy, ...consent } = item;
+          return consent as ConsentDto;
+        });
+      }
+
+      return data as ConsentDto[];
+    } catch (error) {
+      this.logger.error('Error al obtener consentimientos', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene un consentimiento por su ID con detalles adicionales
+   */
+  async findOne(id: string): Promise<ConsentWithDetailsDto> {
+    try {
+      // Obtener el consentimiento con la política legal y los tipos de datos
+      const { data, error } = await this.supabase
+        .from('consent')
+        .select(`
+          *,
+          legal_policy (*),
+          data_subject:data_subject_id (*),
+          consent_data_type (
+            data_type_id,
+            data_type:data_type_id (*)
+          )
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error || !data) {
+        this.logger.error(`Consentimiento no encontrado: ${error?.message}`);
+        throw new NotFoundException('Consentimiento no encontrado');
+      }
+
+      // Transformar los datos al formato esperado
+      const { consent_data_type, ...consentData } = data;
+      const dataTypes = consent_data_type?.map((item) => ({
+        id: item.data_type.id,
+        name: item.data_type.name,
+        description: item.data_type.description,
+      }));
+
+      return {
+        ...consentData,
+        data_types: dataTypes,
+      } as ConsentWithDetailsDto;
+    } catch (error) {
+      this.logger.error(`Error al obtener consentimiento: ${error.message}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualiza el estado de un consentimiento
+   */
+  async updateStatus(
+    id: string,
+    updateStatusDto: UpdateConsentStatusDto,
+    userId: string,
+  ): Promise<ConsentDto> {
+    try {
+      // Obtener el consentimiento actual
+      const { data: currentConsent, error: fetchError } = await this.supabase
+        .from('consent')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !currentConsent) {
+        this.logger.error(`Consentimiento no encontrado: ${fetchError?.message}`);
+        throw new NotFoundException('Consentimiento no encontrado');
+      }
+
+      // Validar la transición de estado
+      this.validateStatusTransition(currentConsent.status, updateStatusDto.status);
+
+      // Actualizar el estado del consentimiento
+      const { data: updatedConsent, error: updateError } = await this.supabase
+        .from('consent')
+        .update({
+          status: updateStatusDto.status,
+          reason: updateStatusDto.reason,
+          metadata: {
+            ...currentConsent.metadata,
+            ...updateStatusDto.metadata,
+            status_updated_at: new Date().toISOString(),
+          },
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError) {
+        this.logger.error(`Error al actualizar estado: ${updateError.message}`, updateError);
+        throw new Error(`Error al actualizar estado: ${updateError.message}`);
+      }
+
+      // Registrar la acción en el log de auditoría
+      await this.auditService.log({
+        action: AuditAction.UPDATE_CONSENT,
+        resourceType: ResourceType.CONSENT,
+        resourceId: id,
+        userId,
+        metadata: {
+          previousStatus: currentConsent.status,
+          newStatus: updateStatusDto.status,
+          reason: updateStatusDto.reason,
+        },
+      });
+
+      return updatedConsent as ConsentDto;
+    } catch (error) {
+      this.logger.error(`Error al actualizar estado: ${error.message}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crea una nueva solicitud de consentimiento
+   */
+  async createRequest(
+    createRequestDto: CreateConsentRequestDto,
+    userId: string,
+  ): Promise<ConsentRequestDto> {
+    try {
+      // Verificar si la política legal existe
+      const { data: policy, error: policyError } = await this.supabase
+        .from('legal_policy')
+        .select('id, company_id')
+        .eq('id', createRequestDto.legalPolicyId)
+        .single();
+
+      if (policyError || !policy) {
+        this.logger.error(`Política legal no encontrada: ${policyError?.message}`);
+        throw new NotFoundException('Política legal no encontrada');
+      }
+
+      // Verificar si los tipos de datos existen
+      const { data: dataTypes, error: dataTypesError } = await this.supabase
+        .from('data_type')
+        .select('id')
+        .in('id', createRequestDto.dataTypeIds);
+
+      if (dataTypesError) {
+        this.logger.error(`Error al verificar tipos de datos: ${dataTypesError.message}`, dataTypesError);
+        throw new Error(`Error al verificar tipos de datos: ${dataTypesError.message}`);
+      }
+
+      if (dataTypes.length !== createRequestDto.dataTypeIds.length) {
+        this.logger.error('Algunos tipos de datos no existen');
+        throw new BadRequestException('Algunos tipos de datos no existen');
+      }
+
+      // Buscar o crear el titular de los datos
+      let dataSubjectId: string;
+      const { data: existingDataSubject, error: dataSubjectError } = await this.supabase
+        .from('data_subject')
+        .select('id')
+        .eq('email', createRequestDto.dataSubjectEmail)
+        .maybeSingle();
+
+      if (dataSubjectError) {
+        this.logger.error(`Error al buscar titular de datos: ${dataSubjectError.message}`, dataSubjectError);
+        throw new Error(`Error al buscar titular de datos: ${dataSubjectError.message}`);
+      }
+
+      if (existingDataSubject) {
+        dataSubjectId = existingDataSubject.id;
+      } else {
+        // Crear nuevo titular de datos
+        const { data: newDataSubject, error: createDataSubjectError } = await this.supabase
+          .from('data_subject')
+          .insert({
+            email: createRequestDto.dataSubjectEmail,
+            name: createRequestDto.dataSubjectName,
+          })
+          .select()
+          .single();
+
+        if (createDataSubjectError) {
+          this.logger.error(`Error al crear titular de datos: ${createDataSubjectError.message}`, createDataSubjectError);
+          throw new Error(`Error al crear titular de datos: ${createDataSubjectError.message}`);
+        }
+
+        dataSubjectId = newDataSubject.id;
+      }
+
+      // Calcular fecha de expiración (30 días por defecto)
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      // Crear la solicitud de consentimiento
+      const { data: consentRequest, error: createRequestError } = await this.supabase
+        .from('consent_request')
+        .insert({
+          data_subject_id: dataSubjectId,
+          legal_policy_id: createRequestDto.legalPolicyId,
+          company_id: policy.company_id,
+          status: 'PENDING',
+          expires_at: expiresAt.toISOString(),
+          metadata: {
+            ...createRequestDto.metadata,
+            data_type_ids: createRequestDto.dataTypeIds,
+            created_by: userId,
+          },
+        })
+        .select()
+        .single();
+
+      if (createRequestError) {
+        this.logger.error(`Error al crear solicitud: ${createRequestError.message}`, createRequestError);
+        throw new Error(`Error al crear solicitud: ${createRequestError.message}`);
+      }
+
+      // Registrar la acción en el log de auditoría
+      await this.auditService.log({
+        action: AuditAction.CREATE,
+        resourceType: ResourceType.CONSENT_REQUEST,
+        resourceId: consentRequest.id,
+        userId,
+        metadata: {
+          dataSubjectEmail: createRequestDto.dataSubjectEmail,
+          legalPolicyId: createRequestDto.legalPolicyId,
+          dataTypeIds: createRequestDto.dataTypeIds,
+        },
+      });
+
+      return consentRequest as ConsentRequestDto;
+    } catch (error) {
+      this.logger.error(`Error al crear solicitud: ${error.message}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene una solicitud de consentimiento por su ID
+   */
+  async findRequest(id: string): Promise<ConsentRequestDto> {
+    try {
+      const { data, error } = await this.supabase
+        .from('consent_request')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error || !data) {
+        this.logger.error(`Solicitud no encontrada: ${error?.message}`);
+        throw new NotFoundException('Solicitud de consentimiento no encontrada');
+      }
+
+      return data as ConsentRequestDto;
+    } catch (error) {
+      this.logger.error(`Error al obtener solicitud: ${error.message}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Responde a una solicitud de consentimiento
+   */
+  async respondToRequest(
+    id: string,
+    respondDto: RespondConsentRequestDto,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<ConsentDto> {
+    try {
+      // Obtener la solicitud de consentimiento
+      const { data: request, error: fetchError } = await this.supabase
+        .from('consent_request')
+        .select('*, legal_policy(*)')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !request) {
+        this.logger.error(`Solicitud no encontrada: ${fetchError?.message}`);
+        throw new NotFoundException('Solicitud de consentimiento no encontrada');
+      }
+
+      // Verificar si la solicitud ya ha sido respondida
+      if (request.status !== 'PENDING') {
+        this.logger.error('La solicitud ya ha sido respondida');
+        throw new BadRequestException('La solicitud ya ha sido respondida');
+      }
+
+      // Verificar si la solicitud ha expirado
+      if (request.expires_at && new Date(request.expires_at) < new Date()) {
+        this.logger.error('La solicitud ha expirado');
+        throw new BadRequestException('La solicitud ha expirado');
+      }
+
+      // Crear un nuevo registro de consentimiento
+      const { data: consent, error: insertError } = await this.supabase
+        .from('consent')
+        .insert({
+          data_subject_id: request.data_subject_id,
+          legal_policy_id: request.legal_policy_id,
+          consent_request_id: id,
+          status: respondDto.accepted ? ConsentStatus.GRANTED : ConsentStatus.DENIED,
+          metadata: {
+            ...respondDto.metadata,
+            ip_address: ipAddress,
+            user_agent: userAgent,
+            timestamp: new Date().toISOString(),
+          },
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        this.logger.error(`Error al crear consentimiento: ${insertError.message}`, insertError);
+        throw new Error('Error al crear registro de consentimiento');
+      }
+
+      // Si se aceptó y hay tipos de datos aceptados, registrarlos
+      if (respondDto.accepted && respondDto.acceptedDataTypeIds && respondDto.acceptedDataTypeIds.length > 0) {
+        const dataTypeEntries = respondDto.acceptedDataTypeIds.map(dataTypeId => ({
+          consent_id: consent.id,
+          data_type_id: dataTypeId,
+        }));
+
+        const { error: dataTypeError } = await this.supabase
+          .from('consent_data_type')
+          .insert(dataTypeEntries);
+
+        if (dataTypeError) {
+          this.logger.error(`Error al registrar tipos de datos: ${dataTypeError.message}`, dataTypeError);
+        }
+      }
+
+      // Actualizar el estado de la solicitud
+      const { error: updateError } = await this.supabase
+        .from('consent_request')
+        .update({
+          status: 'RESPONDED',
+        })
+        .eq('id', id);
+
+      if (updateError) {
+        this.logger.error(`Error al actualizar solicitud: ${updateError.message}`, updateError);
+      }
+
+      // Registrar la acción en el log de auditoría
+      await this.auditService.log({
+        action: respondDto.accepted ? AuditAction.CREATE_CONSENT : AuditAction.DELETE,
+        resourceType: ResourceType.CONSENT,
+        resourceId: consent.id,
+        metadata: {
+          accepted: respondDto.accepted,
+          acceptedDataTypeIds: respondDto.acceptedDataTypeIds,
+          policyTitle: request.legal_policy?.title,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      return consent as ConsentDto;
+    } catch (error) {
+      this.logger.error(`Error al responder solicitud: ${error.message}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Valida la transición de estado de un consentimiento
+   */
+  private validateStatusTransition(currentStatus: ConsentStatus, newStatus: ConsentStatus): void {
+    // Definir las transiciones válidas
+    const validTransitions: Record<ConsentStatus, ConsentStatus[]> = {
+      [ConsentStatus.PENDING]: [ConsentStatus.GRANTED, ConsentStatus.DENIED],
+      [ConsentStatus.GRANTED]: [ConsentStatus.REVOKED, ConsentStatus.EXPIRED],
+      [ConsentStatus.DENIED]: [ConsentStatus.GRANTED],
+      [ConsentStatus.REVOKED]: [],
+      [ConsentStatus.EXPIRED]: [],
+    };
+
+    if (!validTransitions[currentStatus].includes(newStatus)) {
+      throw new BadRequestException(
+        `Transición de estado inválida: de ${currentStatus} a ${newStatus}`,
+      );
+    }
+  }
+}

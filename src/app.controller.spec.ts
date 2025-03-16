@@ -15,8 +15,8 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return welcome message', () => {
+      expect(appController.getHello()).toBe('¡Hola Mundo desde Consentia BFF v1.0.0! Este es un Backend for Frontend construido con NestJS.');
     });
   });
 });
