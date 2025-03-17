@@ -272,12 +272,34 @@ export class ReportsService {
         );
       }
 
+      // Transformar los datos a camelCase
+      const transformedConsents = consents.map(consent => {
+        const { legal_policy, ...consentData } = consent;
+        return {
+          id: consentData.id,
+          dataSubjectId: consentData.data_subject_id,
+          legalPolicyId: consentData.legal_policy_id,
+          consentRequestId: consentData.consent_request_id,
+          status: consentData.status,
+          reason: consentData.reason,
+          metadata: consentData.metadata,
+          createdAt: consentData.created_at,
+          updatedAt: consentData.updated_at,
+          expiresAt: consentData.expires_at,
+          legalPolicy: legal_policy ? {
+            id: legal_policy.id,
+            title: legal_policy.title,
+            companyId: legal_policy.company_id,
+          } : undefined
+        };
+      });
+
       // Calcular métricas
-      const totalConsents = consents.length;
+      const totalConsents = transformedConsents.length;
 
       // Contar consentimientos por estado
       const consentsByStatus = Object.values(ConsentStatus).map((status) => {
-        const count = consents.filter(
+        const count = transformedConsents.filter(
           (consent) => consent.status === status,
         ).length;
         return {
@@ -319,9 +341,9 @@ export class ReportsService {
         // Agrupar por política
         const policyMap = new Map<string, number>();
 
-        consents.forEach((consent) => {
-          const policyId = consent.legal_policy_id;
-          const policyTitle = consent.legal_policy?.title || policyId;
+        transformedConsents.forEach((consent) => {
+          const policyId = consent.legalPolicyId;
+          const policyTitle = consent.legalPolicy?.title || policyId;
 
           if (policyMap.has(policyTitle)) {
             policyMap.set(policyTitle, policyMap.get(policyTitle)! + 1);
@@ -345,8 +367,8 @@ export class ReportsService {
           { total: number; granted: number; denied: number; revoked: number }
         >();
 
-        consents.forEach((consent) => {
-          const date = new Date(consent.created_at);
+        transformedConsents.forEach((consent) => {
+          const date = new Date(consent.createdAt);
           const timeKey = this.formatDate(date, timeFormat);
 
           if (!timeMap.has(timeKey)) {
