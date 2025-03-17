@@ -38,7 +38,22 @@ export class PoliciesService {
         throw new Error(`Error al obtener políticas: ${error.message}`);
       }
 
-      return data as PolicyDto[];
+      // Transformar los datos para el formato de respuesta
+      return data.map(policy => ({
+        id: policy.id,
+        title: policy.title,
+        content: policy.content,
+        companyId: policy.company_id,
+        previousVersionId: policy.previous_version_id,
+        validFrom: policy.valid_from,
+        validTo: policy.valid_to,
+        dataTypes: policy.data_types,
+        createdAt: policy.created_at,
+        updatedAt: policy.updated_at,
+        version: policy.version,
+        status: policy.status,
+        createdBy: policy.created_by,
+      }));
     } catch (error) {
       this.logger.error('Error al obtener políticas', error);
       throw error;
@@ -82,7 +97,22 @@ export class PoliciesService {
         },
       });
 
-      return data as PolicyDto;
+      // Transformar los datos para el formato de respuesta
+      return {
+        id: data.id,
+        title: data.title,
+        content: data.content,
+        companyId: data.company_id,
+        previousVersionId: data.previous_version_id,
+        validFrom: data.valid_from,
+        validTo: data.valid_to,
+        dataTypes: data.data_types,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        version: data.version,
+        status: data.status,
+        createdBy: data.created_by,
+      };
     } catch (error) {
       this.logger.error('Error al crear política', error);
       throw error;
@@ -105,7 +135,22 @@ export class PoliciesService {
         throw new NotFoundException('Política no encontrada');
       }
 
-      return data as PolicyDto;
+      // Transformar los datos para el formato de respuesta
+      return {
+        id: data.id,
+        title: data.title,
+        content: data.content,
+        companyId: data.company_id,
+        previousVersionId: data.previous_version_id,
+        validFrom: data.valid_from,
+        validTo: data.valid_to,
+        dataTypes: data.data_types,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        version: data.version,
+        status: data.status,
+        createdBy: data.created_by,
+      };
     } catch (error) {
       this.logger.error(`Error al obtener política: ${error.message}`, error);
       throw error;
@@ -181,7 +226,22 @@ export class PoliciesService {
         },
       });
 
-      return newPolicy as PolicyDto;
+      // Transformar los datos para el formato de respuesta
+      return {
+        id: newPolicy.id,
+        title: newPolicy.title,
+        content: newPolicy.content,
+        companyId: newPolicy.company_id,
+        previousVersionId: newPolicy.previous_version_id,
+        validFrom: newPolicy.valid_from,
+        validTo: newPolicy.valid_to,
+        dataTypes: newPolicy.data_types,
+        createdAt: newPolicy.created_at,
+        updatedAt: newPolicy.updated_at,
+        version: newPolicy.version,
+        status: newPolicy.status,
+        createdBy: newPolicy.created_by,
+      };
     } catch (error) {
       this.logger.error(
         `Error al actualizar política: ${error.message}`,
@@ -223,7 +283,22 @@ export class PoliciesService {
         throw new Error(`Error al obtener versiones: ${error.message}`);
       }
 
-      return data as PolicyDto[];
+      // Transformar los datos para el formato de respuesta
+      return data.map(policy => ({
+        id: policy.id,
+        title: policy.title,
+        content: policy.content,
+        companyId: policy.company_id,
+        previousVersionId: policy.previous_version_id,
+        validFrom: policy.valid_from,
+        validTo: policy.valid_to,
+        dataTypes: policy.data_types,
+        createdAt: policy.created_at,
+        updatedAt: policy.updated_at,
+        version: policy.version,
+        status: policy.status,
+        createdBy: policy.created_by,
+      }));
     } catch (error) {
       this.logger.error(`Error al obtener versiones: ${error.message}`, error);
       throw error;
