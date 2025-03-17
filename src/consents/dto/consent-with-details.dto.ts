@@ -8,12 +8,12 @@ export class ConsentWithDetailsDto extends ConsentDto {
   /**
    * Detalles de la política legal asociada al consentimiento
    */
-  legal_policy?: PolicyDto;
+  legalPolicy?: PolicyDto;
 
   /**
    * Detalles del titular de los datos
    */
-  data_subject?: {
+  dataSubject?: {
     id: string;
     email: string;
     name: string;
@@ -22,7 +22,7 @@ export class ConsentWithDetailsDto extends ConsentDto {
   /**
    * Tipos de datos incluidos en el consentimiento
    */
-  data_types?: Array<{
+  dataTypes?: Array<{
     id: string;
     name: string;
     description?: string;

@@ -14,19 +14,19 @@ export class ConsentDto {
    * ID del titular de los datos
    * @example "123e4567-e89b-12d3-a456-426614174000"
    */
-  data_subject_id: string;
+  dataSubjectId: string;
 
   /**
    * ID de la política legal asociada al consentimiento
    * @example "123e4567-e89b-12d3-a456-426614174000"
    */
-  legal_policy_id: string;
+  legalPolicyId: string;
 
   /**
    * ID de la solicitud de consentimiento
    * @example "123e4567-e89b-12d3-a456-426614174000"
    */
-  consent_request_id: string;
+  consentRequestId: string;
 
   /**
    * Estado actual del consentimiento
@@ -50,17 +50,17 @@ export class ConsentDto {
    * Fecha de creación del consentimiento
    * @example "2023-01-01T00:00:00.000Z"
    */
-  created_at: string;
+  createdAt: string;
 
   /**
    * Fecha de última actualización del consentimiento
    * @example "2023-01-01T00:00:00.000Z"
    */
-  updated_at: string;
+  updatedAt: string;
 
   /**
    * Fecha de expiración del consentimiento (si aplica)
    * @example "2024-01-01T00:00:00.000Z"
    */
-  expires_at?: string;
+  expiresAt?: string;
 }

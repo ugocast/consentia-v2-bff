@@ -31,14 +31,6 @@ export class ConsentReportQueryDto {
   legalPolicyId?: string;
 
   /**
-   * ID de la política (alias para legalPolicyId para compatibilidad)
-   * @example "123e4567-e89b-12d3-a456-426614174000"
-   */
-  @IsUUID(4)
-  @IsOptional()
-  policyId?: string;
-
-  /**
    * Estado del consentimiento para filtrar
    * @example "GRANTED"
    */
@@ -82,12 +74,4 @@ export class ConsentReportQueryDto {
   @IsOptional()
   @Type(() => Number)
   pageSize?: number = 10;
-
-  /**
-   * Alias para pageSize para mantener compatibilidad con código existente
-   * @deprecated Use pageSize instead
-   */
-  get limit(): number {
-    return this.pageSize || 10;
-  }
 }

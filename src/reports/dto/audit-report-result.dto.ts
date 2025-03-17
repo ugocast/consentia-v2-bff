@@ -20,25 +20,25 @@ export class AuditLogDto {
    * Tipo de recurso afectado
    * @example "CONSENT"
    */
-  resource_type: ResourceType;
+  resourceType: ResourceType;
 
   /**
    * ID del recurso afectado
    * @example "123e4567-e89b-12d3-a456-426614174000"
    */
-  resource_id: string;
+  resourceId: string;
 
   /**
    * ID del usuario que realizó la acción
    * @example "123e4567-e89b-12d3-a456-426614174000"
    */
-  user_id?: string;
+  userId?: string;
 
   /**
    * ID del recurso anterior (en caso de actualizaciones)
    * @example "123e4567-e89b-12d3-a456-426614174000"
    */
-  previous_resource_id?: string;
+  previousResourceId?: string;
 
   /**
    * Metadatos adicionales del registro de auditoría
@@ -49,19 +49,19 @@ export class AuditLogDto {
    * Dirección IP desde donde se realizó la acción
    * @example "192.168.1.1"
    */
-  ip_address?: string;
+  ipAddress?: string;
 
   /**
    * User agent del navegador desde donde se realizó la acción
    * @example "Mozilla/5.0..."
    */
-  user_agent?: string;
+  userAgent?: string;
 
   /**
    * Fecha de creación del registro de auditoría
    * @example "2023-01-01T00:00:00.000Z"
    */
-  created_at: string;
+  createdAt: string;
 }
 
 /**

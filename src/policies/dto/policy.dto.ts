@@ -26,43 +26,43 @@ export class PolicyDto {
    * ID de la compañía a la que pertenece la política
    * @example "123e4567-e89b-12d3-a456-426614174000"
    */
-  company_id: string;
+  companyId: string;
 
   /**
    * ID de la versión anterior de la política
    * @example "123e4567-e89b-12d3-a456-426614174000"
    */
-  previous_version_id?: string;
+  previousVersionId?: string;
 
   /**
    * Fecha desde la que es válida la política
    * @example "2023-01-01T00:00:00.000Z"
    */
-  valid_from: string;
+  validFrom: string;
 
   /**
    * Fecha hasta la que es válida la política
    * @example "2023-12-31T23:59:59.999Z"
    */
-  valid_to?: string | null;
+  validTo?: string | null;
 
   /**
    * Tipos de datos incluidos en la política
    * @example ["email", "nombre", "dirección"]
    */
-  data_types?: string[];
+  dataTypes?: string[];
 
   /**
    * Fecha de creación de la política
    * @example "2023-01-01T00:00:00.000Z"
    */
-  created_at: string;
+  createdAt: string;
 
   /**
    * Fecha de última actualización de la política
    * @example "2023-01-01T00:00:00.000Z"
    */
-  updated_at: string;
+  updatedAt: string;
 
   /**
    * Versión de la política
@@ -80,5 +80,5 @@ export class PolicyDto {
    * ID del usuario que creó la política
    * @example "123e4567-e89b-12d3-a456-426614174000"
    */
-  created_by?: string;
+  createdBy?: string;
 }

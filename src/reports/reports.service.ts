@@ -86,7 +86,23 @@ export class ReportsService {
       const items = data.map((item) => {
         // Extraemos la política legal pero no la necesitamos en la respuesta
         const { legal_policy: _legalPolicy, ...consent } = item;
-        return consent;
+        
+        // Convertir de snake_case a camelCase
+        return {
+          id: consent.id,
+          legalPolicyId: consent.legal_policy_id,
+          userId: consent.user_id,
+          dataSubjectId: consent.data_subject_id,
+          consentRequestId: consent.consent_request_id,
+          status: consent.status,
+          reason: consent.reason,
+          metadata: consent.metadata,
+          ipAddress: consent.ip_address,
+          userAgent: consent.user_agent,
+          createdAt: consent.created_at,
+          updatedAt: consent.updated_at,
+          expiresAt: consent.expires_at,
+        };
       });
 
       // Calcular el número total de páginas
@@ -181,11 +197,25 @@ export class ReportsService {
         );
       }
 
+      // Transformar los datos para el formato de respuesta
+      const items = data.map((item) => ({
+        id: item.id,
+        action: item.action,
+        resourceType: item.resource_type,
+        resourceId: item.resource_id,
+        userId: item.user_id,
+        previousResourceId: item.previous_resource_id,
+        metadata: item.metadata,
+        ipAddress: item.ip_address,
+        userAgent: item.user_agent,
+        createdAt: item.created_at,
+      }));
+
       // Calcular el número total de páginas
       const totalPages = Math.ceil((count || 0) / pageSize);
 
       return {
-        items: data as AuditLogDto[],
+        items,
         total: count || 0,
         page,
         pageSize,

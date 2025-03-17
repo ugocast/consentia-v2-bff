@@ -4,16 +4,7 @@ import {
   IsArray,
   IsOptional,
   IsUUID,
-  IsEnum,
 } from 'class-validator';
-
-/**
- * Enum para los tipos de respuesta a solicitudes de consentimiento
- */
-export enum ConsentResponseType {
-  ACCEPT = 'ACCEPT',
-  REJECT = 'REJECT',
-}
 
 /**
  * DTO para responder a solicitudes de consentimiento
@@ -26,15 +17,6 @@ export class RespondConsentRequestDto {
   @IsBoolean()
   @IsNotEmpty()
   accepted: boolean;
-
-  /**
-   * Tipo de respuesta (ACCEPT o REJECT)
-   * @example "ACCEPT"
-   * @deprecated Use accepted instead
-   */
-  @IsEnum(ConsentResponseType)
-  @IsOptional()
-  response?: ConsentResponseType;
 
   /**
    * IDs de los tipos de datos aceptados (solo si accepted es true)
