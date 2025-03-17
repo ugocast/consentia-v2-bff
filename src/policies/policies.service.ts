@@ -352,4 +352,99 @@ export class PoliciesService {
       throw error;
     }
   }
+
+  /**
+   * Obtiene el historial completo de versiones de una política
+   * @param id - ID de la política para obtener su historial
+   * @returns Lista de versiones de la política ordenadas cronológicamente
+   * @throws NotFoundException si la política no existe
+   */
+  async getVersionHistory(id: string): Promise<PolicyDto[]> {
+    try {
+      // Obtener la política actual
+      const { data: currentPolicy, error: fetchError } = await this.supabase
+        .from('legal_policy')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !currentPolicy) {
+        this.logger.error(`Política no encontrada: ${fetchError?.message}`);
+        throw new NotFoundException('Política no encontrada');
+      }
+
+      // Encontrar la versión más antigua (la que no tiene previous_version_id)
+      let rootPolicy = currentPolicy;
+      let previousVersionId = currentPolicy.previous_version_id;
+
+      // Si la política actual tiene una versión anterior, buscar la raíz
+      if (previousVersionId) {
+        while (previousVersionId) {
+          const { data, error } = await this.supabase
+            .from('legal_policy')
+            .select('*')
+            .eq('id', previousVersionId)
+            .single();
+
+          if (error || !data) {
+            break;
+          }
+
+          rootPolicy = data;
+          previousVersionId = data.previous_version_id;
+        }
+      }
+
+      // Obtener todas las versiones a partir de la raíz
+      const versions: any[] = [];
+      let currentId = rootPolicy.id;
+      let hasNext = true;
+
+      while (hasNext) {
+        const { data, error } = await this.supabase
+          .from('legal_policy')
+          .select('*')
+          .eq('id', currentId)
+          .single();
+
+        if (error || !data) {
+          break;
+        }
+
+        versions.push(data);
+
+        // Buscar la siguiente versión (la que tiene esta como previous_version_id)
+        const { data: nextVersions, error: nextError } = await this.supabase
+          .from('legal_policy')
+          .select('*')
+          .eq('previous_version_id', currentId);
+
+        if (nextError || !nextVersions || nextVersions.length === 0) {
+          hasNext = false;
+        } else {
+          currentId = nextVersions[0].id;
+        }
+      }
+
+      // Transformar los datos para el formato de respuesta
+      return versions.map(policy => ({
+        id: policy.id,
+        title: policy.title,
+        content: policy.content,
+        companyId: policy.company_id,
+        previousVersionId: policy.previous_version_id,
+        validFrom: policy.valid_from,
+        validTo: policy.valid_to,
+        dataTypes: policy.data_types,
+        createdAt: policy.created_at,
+        updatedAt: policy.updated_at,
+        version: policy.version,
+        status: policy.status,
+        createdBy: policy.created_by,
+      }));
+    } catch (error) {
+      this.logger.error(`Error al obtener historial de versiones: ${error.message}`, error);
+      throw error;
+    }
+  }
 }

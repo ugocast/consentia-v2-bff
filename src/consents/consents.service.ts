@@ -70,16 +70,25 @@ export class ConsentsService {
         throw new Error(`Error al obtener consentimientos: ${error.message}`);
       }
 
-      // Si filtramos por compañía, necesitamos limpiar los datos para devolver solo los consentimientos
-      if (companyId) {
-        return data.map((item) => {
-          // Extraemos la política legal pero no la necesitamos en la respuesta
-          const { legal_policy: _legalPolicy, ...consent } = item;
-          return consent as ConsentDto;
-        });
-      }
-
-      return data as ConsentDto[];
+      // Transformar los datos al formato esperado
+      return data.map((item) => {
+        // Si filtramos por compañía, extraemos la política legal pero no la necesitamos en la respuesta
+        const { legal_policy: _legalPolicy, ...consent } = item;
+        
+        // Transformar el consentimiento a camelCase
+        return {
+          id: consent.id,
+          dataSubjectId: consent.data_subject_id,
+          legalPolicyId: consent.legal_policy_id,
+          consentRequestId: consent.consent_request_id,
+          status: consent.status,
+          reason: consent.reason,
+          metadata: consent.metadata,
+          createdAt: consent.created_at,
+          updatedAt: consent.updated_at,
+          expiresAt: consent.expires_at,
+        };
+      });
     } catch (error) {
       this.logger.error('Error al obtener consentimientos', error);
       throw error;
@@ -118,17 +127,55 @@ export class ConsentsService {
       }
 
       // Transformar los datos al formato esperado
-      const { consent_data_type, ...consentData } = data;
+      const { consent_data_type, legal_policy, data_subject, ...consentData } = data;
+      
+      // Transformar los tipos de datos
       const dataTypes = consent_data_type?.map((item) => ({
         id: item.data_type.id,
         name: item.data_type.name,
         description: item.data_type.description,
       }));
 
+      // Transformar la política legal si existe
+      const legalPolicy = legal_policy ? {
+        id: legal_policy.id,
+        title: legal_policy.title,
+        content: legal_policy.content,
+        companyId: legal_policy.company_id,
+        previousVersionId: legal_policy.previous_version_id,
+        validFrom: legal_policy.valid_from,
+        validTo: legal_policy.valid_to,
+        dataTypes: legal_policy.data_types,
+        createdAt: legal_policy.created_at,
+        updatedAt: legal_policy.updated_at,
+        version: legal_policy.version,
+        status: legal_policy.status,
+        createdBy: legal_policy.created_by,
+      } : undefined;
+
+      // Transformar el titular de datos si existe
+      const dataSubject = data_subject ? {
+        id: data_subject.id,
+        email: data_subject.email,
+        name: data_subject.name,
+      } : undefined;
+
+      // Transformar el consentimiento
       return {
-        ...consentData,
-        data_types: dataTypes,
-      } as ConsentWithDetailsDto;
+        id: consentData.id,
+        dataSubjectId: consentData.data_subject_id,
+        legalPolicyId: consentData.legal_policy_id,
+        consentRequestId: consentData.consent_request_id,
+        status: consentData.status,
+        reason: consentData.reason,
+        metadata: consentData.metadata,
+        createdAt: consentData.created_at,
+        updatedAt: consentData.updated_at,
+        expiresAt: consentData.expires_at,
+        dataTypes,
+        legalPolicy,
+        dataSubject,
+      };
     } catch (error) {
       this.logger.error(
         `Error al obtener consentimiento: ${error.message}`,
@@ -211,7 +258,19 @@ export class ConsentsService {
         },
       });
 
-      return updatedConsent as ConsentDto;
+      // Transformar el consentimiento a camelCase
+      return {
+        id: updatedConsent.id,
+        dataSubjectId: updatedConsent.data_subject_id,
+        legalPolicyId: updatedConsent.legal_policy_id,
+        consentRequestId: updatedConsent.consent_request_id,
+        status: updatedConsent.status,
+        reason: updatedConsent.reason,
+        metadata: updatedConsent.metadata,
+        createdAt: updatedConsent.created_at,
+        updatedAt: updatedConsent.updated_at,
+        expiresAt: updatedConsent.expires_at,
+      };
     } catch (error) {
       this.logger.error(`Error al actualizar estado: ${error.message}`, error);
       throw error;
@@ -359,7 +418,18 @@ export class ConsentsService {
         },
       });
 
-      return consentRequest as ConsentRequestDto;
+      // Transformar la solicitud a camelCase
+      return {
+        id: consentRequest.id,
+        dataSubjectId: consentRequest.data_subject_id,
+        legalPolicyId: consentRequest.legal_policy_id,
+        companyId: consentRequest.company_id,
+        status: consentRequest.status,
+        expiresAt: consentRequest.expires_at,
+        metadata: consentRequest.metadata,
+        createdAt: consentRequest.created_at,
+        updatedAt: consentRequest.updated_at,
+      };
     } catch (error) {
       this.logger.error(`Error al crear solicitud: ${error.message}`, error);
       throw error;
@@ -388,7 +458,18 @@ export class ConsentsService {
         );
       }
 
-      return data as ConsentRequestDto;
+      // Transformar la solicitud a camelCase
+      return {
+        id: data.id,
+        dataSubjectId: data.data_subject_id,
+        legalPolicyId: data.legal_policy_id,
+        companyId: data.company_id,
+        status: data.status,
+        expiresAt: data.expires_at,
+        metadata: data.metadata,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      };
     } catch (error) {
       this.logger.error(`Error al obtener solicitud: ${error.message}`, error);
       throw error;
@@ -523,7 +604,19 @@ export class ConsentsService {
         userAgent,
       });
 
-      return consent as ConsentDto;
+      // Transformar el consentimiento a camelCase
+      return {
+        id: consent.id,
+        dataSubjectId: consent.data_subject_id,
+        legalPolicyId: consent.legal_policy_id,
+        consentRequestId: consent.consent_request_id,
+        status: consent.status,
+        reason: consent.reason,
+        metadata: consent.metadata,
+        createdAt: consent.created_at,
+        updatedAt: consent.updated_at,
+        expiresAt: consent.expires_at,
+      };
     } catch (error) {
       this.logger.error(
         `Error al responder solicitud: ${error.message}`,
