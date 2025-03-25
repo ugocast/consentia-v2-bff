@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { createSupabaseClient } from '../config/supabase.config';
 import { UpdateUserDto, UserDto } from './dto/user.dto';
 
@@ -81,5 +81,24 @@ export class UsersService {
     }
 
     return { success: true };
+  }
+
+  async getAllUsers() {
+    // Obtener todos los usuarios de Supabase
+    const { data, error } = await this.supabase.auth.admin.listUsers();
+    
+    if (error) {
+      throw new InternalServerErrorException(
+        `Error al obtener usuarios: ${error.message}`,
+      );
+    }
+    
+    return data.users.map(user => ({
+      id: user.id,
+      email: user.email,
+      name: user.user_metadata?.name || '',
+      createdAt: user.created_at,
+      lastSignIn: user.last_sign_in_at,
+    }));
   }
 }

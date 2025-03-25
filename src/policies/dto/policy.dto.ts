@@ -77,6 +77,12 @@ export class PolicyDto {
   status?: PolicyStatus;
 
   /**
+   * Metadatos adicionales de la política
+   * @example { "legalReferences": ["GDPR Art. 6"], "version": "1.0.0" }
+   */
+  metadata?: Record<string, any>;
+
+  /**
    * ID del usuario que creó la política
    * @example "123e4567-e89b-12d3-a456-426614174000"
    */

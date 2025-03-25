@@ -58,13 +58,13 @@ describe('ConsentsService', () => {
       const mockConsents: ConsentDto[] = [
         {
           id: 'consent-1',
-          legal_policy_id: 'policy-1',
-          data_subject_id: 'user-1',
-          consent_request_id: 'request-1',
+          legalPolicyId: 'policy-1',
+          dataSubjectId: 'user-1',
+          consentRequestId: 'request-1',
           status: ConsentStatus.GRANTED,
-          created_at: '2023-01-01T00:00:00Z',
-          updated_at: '2023-01-01T00:00:00Z',
-          expires_at: '2024-01-01T00:00:00Z',
+          createdAt: '2023-01-01T00:00:00Z',
+          updatedAt: '2023-01-01T00:00:00Z',
+          expiresAt: '2024-01-01T00:00:00Z',
         },
       ];
 
@@ -81,7 +81,7 @@ describe('ConsentsService', () => {
 
       // Usar una función para simular la resolución de la promesa
       const mockThen = jest.fn().mockResolvedValue(mockResponse);
-      mockSupabaseClient.then = mockThen;
+      mockSupabaseClient.then = mockThen as any;
 
       // Act
       const result = await service.findAll();
@@ -98,13 +98,13 @@ describe('ConsentsService', () => {
       const mockConsents: ConsentDto[] = [
         {
           id: 'consent-1',
-          legal_policy_id: 'policy-1',
-          data_subject_id: dataSubjectId,
-          consent_request_id: 'request-1',
+          legalPolicyId: 'policy-1',
+          dataSubjectId: dataSubjectId,
+          consentRequestId: 'request-1',
           status: ConsentStatus.GRANTED,
-          created_at: '2023-01-01T00:00:00Z',
-          updated_at: '2023-01-01T00:00:00Z',
-          expires_at: '2024-01-01T00:00:00Z',
+          createdAt: '2023-01-01T00:00:00Z',
+          updatedAt: '2023-01-01T00:00:00Z',
+          expiresAt: '2024-01-01T00:00:00Z',
         },
       ];
 
@@ -121,7 +121,7 @@ describe('ConsentsService', () => {
 
       // Usar una función para simular la resolución de la promesa
       const mockThen = jest.fn().mockResolvedValue(mockResponse);
-      mockSupabaseClient.then = mockThen;
+      mockSupabaseClient.then = mockThen as any;
 
       // Act
       const result = await service.findAll(undefined, dataSubjectId);
@@ -149,7 +149,7 @@ describe('ConsentsService', () => {
 
       // Usar una función para simular la resolución de la promesa
       const mockThen = jest.fn().mockResolvedValue(mockResponse);
-      mockSupabaseClient.then = mockThen;
+      mockSupabaseClient.then = mockThen as any;
 
       // Act & Assert
       await expect(service.findAll()).rejects.toThrow(
@@ -164,13 +164,13 @@ describe('ConsentsService', () => {
       const consentId = 'consent-1';
       const mockConsent: ConsentDto = {
         id: consentId,
-        legal_policy_id: 'policy-1',
-        data_subject_id: 'user-1',
-        consent_request_id: 'request-1',
+        legalPolicyId: 'policy-1',
+        dataSubjectId: 'user-1',
+        consentRequestId: 'request-1',
         status: ConsentStatus.GRANTED,
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-01T00:00:00Z',
-        expires_at: '2024-01-01T00:00:00Z',
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
+        expiresAt: '2024-01-01T00:00:00Z',
       };
 
       // Mock de la respuesta de Supabase
@@ -182,7 +182,7 @@ describe('ConsentsService', () => {
       mockSupabaseClient.single = jest.fn().mockResolvedValue({
         data: mockConsent,
         error: null,
-      });
+      }) as any;
 
       // Act
       const result = await service.findOne(consentId);
@@ -207,7 +207,7 @@ describe('ConsentsService', () => {
       mockSupabaseClient.single = jest.fn().mockResolvedValue({
         data: null,
         error: { message: 'Consent not found' },
-      });
+      }) as any;
 
       // Act & Assert
       await expect(service.findOne(consentId)).rejects.toThrow(
@@ -216,27 +216,27 @@ describe('ConsentsService', () => {
     });
   });
 
-  describe('createConsentRequest', () => {
+  describe('createRequest', () => {
     it('should create a new consent request', async () => {
       // Arrange
       const userId = 'user-1';
       const createConsentRequestDto: CreateConsentRequestDto = {
+        dataSubjectEmail: 'test@example.com',
+        dataSubjectName: 'Test User',
         legalPolicyId: 'policy-1',
-        dataSubjectEmail: 'user2@example.com',
-        dataSubjectName: 'User Two',
         dataTypeIds: ['datatype-1', 'datatype-2'],
         expiresAt: '2024-01-01T00:00:00Z',
       };
 
       const mockCreatedRequest: ConsentRequestDto = {
         id: 'request-1',
-        legal_policy_id: createConsentRequestDto.legalPolicyId,
-        data_subject_id: 'user-2',
-        company_id: 'company-1',
+        legalPolicyId: createConsentRequestDto.legalPolicyId,
+        dataSubjectId: 'user-2',
+        companyId: 'company-1',
         status: 'PENDING',
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-01T00:00:00Z',
-        expires_at: createConsentRequestDto.expiresAt,
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
+        expiresAt: createConsentRequestDto.expiresAt,
       };
 
       // Mock para verificar que la política existe
@@ -249,7 +249,7 @@ describe('ConsentsService', () => {
       mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
         data: { id: 'policy-1' },
         error: null,
-      });
+      }) as any;
 
       // Mock para insertar la solicitud
       mockSupabaseClient.insert.mockReturnValue(mockSupabaseClient);
@@ -261,10 +261,10 @@ describe('ConsentsService', () => {
           error: null,
         }),
       });
-      mockSupabaseClient.select = mockSelectAfterInsert;
+      mockSupabaseClient.select = mockSelectAfterInsert as any;
 
       // Act
-      const result = await service.createConsentRequest(
+      const result = await service.createRequest(
         createConsentRequestDto,
         userId,
       );
@@ -282,7 +282,7 @@ describe('ConsentsService', () => {
       expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
         expect.objectContaining({
           legal_policy_id: createConsentRequestDto.legalPolicyId,
-          data_subject_id: createConsentRequestDto.dataSubjectId,
+          data_subject_email: createConsentRequestDto.dataSubjectEmail,
           requested_by: userId,
           status: 'PENDING',
           expires_at: createConsentRequestDto.expiresAt,
@@ -297,9 +297,9 @@ describe('ConsentsService', () => {
       // Arrange
       const userId = 'user-1';
       const createConsentRequestDto: CreateConsentRequestDto = {
+        dataSubjectEmail: 'test@example.com',
+        dataSubjectName: 'Test User',
         legalPolicyId: 'nonexistent-policy-id',
-        dataSubjectEmail: 'user2@example.com',
-        dataSubjectName: 'User Two',
         dataTypeIds: ['datatype-1', 'datatype-2'],
         expiresAt: '2024-01-01T00:00:00Z',
       };
@@ -314,50 +314,51 @@ describe('ConsentsService', () => {
       mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
         data: null,
         error: { message: 'Policy not found' },
-      });
+      }) as any;
 
       // Act & Assert
       await expect(
-        service.createConsentRequest(createConsentRequestDto, userId),
+        service.createRequest(createConsentRequestDto, userId),
       ).rejects.toThrow(NotFoundException);
     });
   });
 
-  describe('respondToConsentRequest', () => {
+  describe('respondToRequest', () => {
     it('should accept a consent request', async () => {
       // Arrange
       const requestId = 'request-1';
       const userId = 'user-2';
       const respondDto: RespondConsentRequestDto = {
-        response: 'ACCEPT',
+        accepted: true,
+        acceptedDataTypeIds: ['datatype-1', 'datatype-2'],
       };
 
       const mockRequest: ConsentRequestDto = {
         id: requestId,
-        legal_policy_id: 'policy-1',
-        data_subject_id: userId,
-        requested_by: 'user-1',
+        legalPolicyId: 'policy-1',
+        dataSubjectId: userId,
+        companyId: 'company-1',
         status: 'PENDING',
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-01T00:00:00Z',
-        expires_at: '2024-01-01T00:00:00Z',
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
+        expiresAt: '2024-01-01T00:00:00Z',
       };
 
       const mockUpdatedRequest: ConsentRequestDto = {
         ...mockRequest,
         status: 'ACCEPTED',
-        updated_at: '2023-01-02T00:00:00Z',
+        updatedAt: '2023-01-02T00:00:00Z',
       };
 
       const mockConsent: ConsentDto = {
         id: 'consent-1',
-        legal_policy_id: mockRequest.legal_policy_id,
-        data_subject_id: mockRequest.data_subject_id,
-        consent_request_id: 'request-1',
+        legalPolicyId: mockRequest.legalPolicyId,
+        dataSubjectId: mockRequest.dataSubjectId,
+        consentRequestId: 'request-1',
         status: ConsentStatus.GRANTED,
-        created_at: '2023-01-02T00:00:00Z',
-        updated_at: '2023-01-02T00:00:00Z',
-        expires_at: mockRequest.expires_at,
+        createdAt: '2023-01-02T00:00:00Z',
+        updatedAt: '2023-01-02T00:00:00Z',
+        expiresAt: mockRequest.expiresAt,
       };
 
       // Mock para obtener la solicitud
@@ -375,7 +376,7 @@ describe('ConsentsService', () => {
         .mockResolvedValueOnce({
           data: mockConsent,
           error: null,
-        });
+        }) as any;
 
       // Mock para actualizar la solicitud
       mockSupabaseClient.update.mockReturnValue(mockSupabaseClient);
@@ -385,13 +386,13 @@ describe('ConsentsService', () => {
         data: { id: requestId },
         error: null,
       });
-      mockSupabaseClient.then = mockThenAfterUpdate;
+      mockSupabaseClient.then = mockThenAfterUpdate as any;
 
       // Mock para insertar el consentimiento
       mockSupabaseClient.insert.mockReturnValue(mockSupabaseClient);
 
       // Act
-      const result = await service.respondToConsentRequest(
+      const result = await service.respondToRequest(
         requestId,
         respondDto,
         userId,
@@ -412,10 +413,10 @@ describe('ConsentsService', () => {
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('consent');
       expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
         expect.objectContaining({
-          legal_policy_id: mockRequest.legal_policy_id,
-          data_subject_id: mockRequest.data_subject_id,
+          legal_policy_id: mockRequest.legalPolicyId,
+          data_subject_id: mockRequest.dataSubjectId,
           status: ConsentStatus.GRANTED,
-          expires_at: mockRequest.expires_at,
+          expires_at: mockRequest.expiresAt,
         }),
       );
 
@@ -431,24 +432,24 @@ describe('ConsentsService', () => {
       const requestId = 'request-1';
       const userId = 'user-2';
       const respondDto: RespondConsentRequestDto = {
-        response: 'REJECT',
+        accepted: false,
       };
 
       const mockRequest: ConsentRequestDto = {
         id: requestId,
-        legal_policy_id: 'policy-1',
-        data_subject_id: userId,
-        requested_by: 'user-1',
+        legalPolicyId: 'policy-1',
+        dataSubjectId: userId,
+        companyId: 'company-1',
         status: 'PENDING',
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-01T00:00:00Z',
-        expires_at: '2024-01-01T00:00:00Z',
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
+        expiresAt: '2024-01-01T00:00:00Z',
       };
 
       const mockUpdatedRequest: ConsentRequestDto = {
         ...mockRequest,
         status: 'REJECTED',
-        updated_at: '2023-01-02T00:00:00Z',
+        updatedAt: '2023-01-02T00:00:00Z',
       };
 
       // Mock para obtener la solicitud
@@ -460,7 +461,7 @@ describe('ConsentsService', () => {
       mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
         data: mockRequest,
         error: null,
-      });
+      }) as any;
 
       // Mock para actualizar la solicitud
       mockSupabaseClient.update.mockReturnValue(mockSupabaseClient);
@@ -470,10 +471,10 @@ describe('ConsentsService', () => {
         data: { id: requestId },
         error: null,
       });
-      mockSupabaseClient.then = mockThenAfterUpdate;
+      mockSupabaseClient.then = mockThenAfterUpdate as any;
 
       // Act
-      const result = await service.respondToConsentRequest(
+      const result = await service.respondToRequest(
         requestId,
         respondDto,
         userId,
@@ -503,7 +504,8 @@ describe('ConsentsService', () => {
       const requestId = 'nonexistent-request-id';
       const userId = 'user-2';
       const respondDto: RespondConsentRequestDto = {
-        response: 'ACCEPT',
+        accepted: true,
+        acceptedDataTypeIds: ['datatype-1', 'datatype-2'],
       };
 
       // Mock para obtener la solicitud
@@ -515,11 +517,11 @@ describe('ConsentsService', () => {
       mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
         data: null,
         error: { message: 'Request not found' },
-      });
+      }) as any;
 
       // Act & Assert
       await expect(
-        service.respondToConsentRequest(requestId, respondDto, userId),
+        service.respondToRequest(requestId, respondDto, userId),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -528,18 +530,19 @@ describe('ConsentsService', () => {
       const requestId = 'request-1';
       const userId = 'user-3'; // Different from data_subject_id
       const respondDto: RespondConsentRequestDto = {
-        response: 'ACCEPT',
+        accepted: true,
+        acceptedDataTypeIds: ['datatype-1', 'datatype-2'],
       };
 
       const mockRequest: ConsentRequestDto = {
         id: requestId,
-        legal_policy_id: 'policy-1',
-        data_subject_id: 'user-2', // Different from userId
-        requested_by: 'user-1',
+        legalPolicyId: 'policy-1',
+        dataSubjectId: 'user-2', // Different from userId
+        companyId: 'company-1',
         status: 'PENDING',
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-01T00:00:00Z',
-        expires_at: '2024-01-01T00:00:00Z',
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
+        expiresAt: '2024-01-01T00:00:00Z',
       };
 
       // Mock para obtener la solicitud
@@ -551,11 +554,11 @@ describe('ConsentsService', () => {
       mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
         data: mockRequest,
         error: null,
-      });
+      }) as any;
 
       // Act & Assert
       await expect(
-        service.respondToConsentRequest(requestId, respondDto, userId),
+        service.respondToRequest(requestId, respondDto, userId),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -564,18 +567,19 @@ describe('ConsentsService', () => {
       const requestId = 'request-1';
       const userId = 'user-2';
       const respondDto: RespondConsentRequestDto = {
-        response: 'ACCEPT',
+        accepted: true,
+        acceptedDataTypeIds: ['datatype-1', 'datatype-2'],
       };
 
       const mockRequest: ConsentRequestDto = {
         id: requestId,
-        legal_policy_id: 'policy-1',
-        data_subject_id: userId,
-        requested_by: 'user-1',
+        legalPolicyId: 'policy-1',
+        dataSubjectId: userId,
+        companyId: 'company-1',
         status: 'ACCEPTED', // Already accepted
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-01T00:00:00Z',
-        expires_at: '2024-01-01T00:00:00Z',
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
+        expiresAt: '2024-01-01T00:00:00Z',
       };
 
       // Mock para obtener la solicitud
@@ -587,16 +591,16 @@ describe('ConsentsService', () => {
       mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
         data: mockRequest,
         error: null,
-      });
+      }) as any;
 
       // Act & Assert
       await expect(
-        service.respondToConsentRequest(requestId, respondDto, userId),
+        service.respondToRequest(requestId, respondDto, userId),
       ).rejects.toThrow(BadRequestException);
     });
   });
 
-  describe('updateConsentStatus', () => {
+  describe('updateStatus', () => {
     it('should update consent status to revoked', async () => {
       // Arrange
       const consentId = 'consent-1';
@@ -607,19 +611,19 @@ describe('ConsentsService', () => {
 
       const mockConsent: ConsentDto = {
         id: consentId,
-        legal_policy_id: 'policy-1',
-        data_subject_id: userId,
-        consent_request_id: 'request-1',
+        legalPolicyId: 'policy-1',
+        dataSubjectId: userId,
+        consentRequestId: 'request-1',
         status: ConsentStatus.GRANTED,
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-01T00:00:00Z',
-        expires_at: '2024-01-01T00:00:00Z',
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
+        expiresAt: '2024-01-01T00:00:00Z',
       };
 
       const mockUpdatedConsent: ConsentDto = {
         ...mockConsent,
         status: ConsentStatus.REVOKED,
-        updated_at: '2023-01-02T00:00:00Z',
+        updatedAt: '2023-01-02T00:00:00Z',
       };
 
       // Mock para obtener el consentimiento
@@ -637,13 +641,13 @@ describe('ConsentsService', () => {
         .mockResolvedValueOnce({
           data: mockUpdatedConsent,
           error: null,
-        });
+        }) as any;
 
       // Mock para actualizar el consentimiento
       mockSupabaseClient.update.mockReturnValue(mockSupabaseClient);
 
       // Act
-      const result = await service.updateConsentStatus(
+      const result = await service.updateStatus(
         consentId,
         updateDto,
         userId,
@@ -682,11 +686,11 @@ describe('ConsentsService', () => {
       mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
         data: null,
         error: { message: 'Consent not found' },
-      });
+      }) as any;
 
       // Act & Assert
       await expect(
-        service.updateConsentStatus(consentId, updateDto, userId),
+        service.updateStatus(consentId, updateDto, userId),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -700,13 +704,13 @@ describe('ConsentsService', () => {
 
       const mockConsent: ConsentDto = {
         id: consentId,
-        legal_policy_id: 'policy-1',
-        data_subject_id: 'user-1', // Different from userId
-        consent_request_id: 'request-1',
+        legalPolicyId: 'policy-1',
+        dataSubjectId: 'user-1', // Different from userId
+        consentRequestId: 'request-1',
         status: ConsentStatus.GRANTED,
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-01T00:00:00Z',
-        expires_at: '2024-01-01T00:00:00Z',
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
+        expiresAt: '2024-01-01T00:00:00Z',
       };
 
       // Mock para obtener el consentimiento
@@ -718,11 +722,11 @@ describe('ConsentsService', () => {
       mockSupabaseClient.single = jest.fn().mockResolvedValueOnce({
         data: mockConsent,
         error: null,
-      });
+      }) as any;
 
       // Act & Assert
       await expect(
-        service.updateConsentStatus(consentId, updateDto, userId),
+        service.updateStatus(consentId, updateDto, userId),
       ).rejects.toThrow(BadRequestException);
     });
   });

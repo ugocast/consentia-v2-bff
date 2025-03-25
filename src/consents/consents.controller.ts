@@ -8,6 +8,8 @@ import {
   UseGuards,
   Query,
   Req,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ConsentsService } from './consents.service';
 import {
@@ -18,6 +20,10 @@ import {
   ConsentRequestDto,
   ConsentWithDetailsDto,
   ConsentStatus,
+  ConsentResponseDto,
+  ConsentStatusResponseDto,
+  ConsentRequestResponseDto,
+  ConsentRequestAnswerResponseDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -26,8 +32,12 @@ import { UserRole } from '../users/enums/user-role.enum';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe';
 import { Request } from 'express';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
 
+@ApiTags('consents')
+@ApiBearerAuth()
 @Controller('consents')
+@UseGuards(JwtAuthGuard)
 export class ConsentsController {
   constructor(private readonly consentsService: ConsentsService) {}
 
@@ -38,8 +48,14 @@ export class ConsentsController {
    * @param status Estado para filtrar consentimientos
    * @returns Lista de consentimientos
    */
-  @UseGuards(JwtAuthGuard)
   @Get()
+  @ApiOperation({ summary: 'Obtiene todos los consentimientos con filtros opcionales' })
+  @ApiResponse({ status: 200, description: 'Lista de consentimientos obtenida', type: [ConsentDto] })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  @ApiQuery({ name: 'companyId', required: false, description: 'ID de la compañía' })
+  @ApiQuery({ name: 'dataSubjectId', required: false, description: 'ID del titular de datos' })
+  @ApiQuery({ name: 'status', required: false, enum: ConsentStatus, description: 'Estado del consentimiento' })
   async findAll(
     @Query('companyId') companyId?: string,
     @Query('dataSubjectId') dataSubjectId?: string,
@@ -53,8 +69,13 @@ export class ConsentsController {
    * @param id ID del consentimiento
    * @returns Consentimiento con detalles
    */
-  @UseGuards(JwtAuthGuard)
   @Get(':id')
+  @ApiOperation({ summary: 'Obtiene un consentimiento por su ID con detalles adicionales' })
+  @ApiResponse({ status: 200, description: 'Consentimiento obtenido', type: ConsentWithDetailsDto })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 404, description: 'Consentimiento no encontrado' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  @ApiParam({ name: 'id', description: 'ID del consentimiento' })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ConsentWithDetailsDto> {
@@ -65,33 +86,59 @@ export class ConsentsController {
    * Actualiza el estado de un consentimiento
    * @param id ID del consentimiento
    * @param updateStatusDto Datos para actualizar el estado
-   * @param user Usuario autenticado
+   * @param userId ID del usuario autenticado
    * @returns Consentimiento actualizado
    */
-  @UseGuards(JwtAuthGuard)
   @Patch(':id/status')
+  @ApiOperation({ summary: 'Actualiza el estado de un consentimiento' })
+  @ApiResponse({ status: 200, description: 'Estado actualizado', type: ConsentStatusResponseDto })
+  @ApiResponse({ status: 400, description: 'Solicitud inválida' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 404, description: 'Consentimiento no encontrado' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  @ApiParam({ name: 'id', description: 'ID del consentimiento' })
   async updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateStatusDto: UpdateConsentStatusDto,
-    @CurrentUser() user: any,
-  ): Promise<ConsentDto> {
-    return this.consentsService.updateStatus(id, updateStatusDto, user.id);
+    @CurrentUser('id') userId: string,
+  ): Promise<ConsentStatusResponseDto> {
+    const oldConsent = await this.consentsService.findOne(id);
+    const result = await this.consentsService.updateStatus(id, updateStatusDto, userId);
+    return {
+      message: 'Estado del consentimiento actualizado correctamente',
+      id: result.id,
+      previousStatus: oldConsent.status as ConsentStatus,
+      currentStatus: result.status as ConsentStatus,
+      updatedAt: result.updatedAt
+    };
   }
 
   /**
    * Crea una nueva solicitud de consentimiento
    * @param createRequestDto Datos para crear la solicitud
-   * @param user Usuario autenticado
+   * @param userId ID del usuario autenticado
    * @returns Solicitud de consentimiento creada
    */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @Post('requests')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Crea una nueva solicitud de consentimiento' })
+  @ApiResponse({ status: 201, description: 'Solicitud creada', type: ConsentRequestResponseDto })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Prohibido' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
   async createRequest(
     @Body() createRequestDto: CreateConsentRequestDto,
-    @CurrentUser() user: any,
-  ): Promise<ConsentRequestDto> {
-    return this.consentsService.createRequest(createRequestDto, user.id);
+    @CurrentUser('id') userId: string,
+  ): Promise<ConsentRequestResponseDto> {
+    const result = await this.consentsService.createRequest(createRequestDto, userId);
+    return {
+      message: 'Solicitud de consentimiento creada correctamente',
+      requestId: result.id,
+      responseUrl: `${process.env.APP_BASE_URL || 'https://app.consentia.io'}/consents/respond/${result.id}`,
+      expiresAt: result.expiresAt
+    };
   }
 
   /**
@@ -100,6 +147,11 @@ export class ConsentsController {
    * @returns Solicitud de consentimiento
    */
   @Get('requests/:id')
+  @ApiOperation({ summary: 'Obtiene una solicitud de consentimiento por su ID' })
+  @ApiResponse({ status: 200, description: 'Solicitud obtenida', type: ConsentRequestDto })
+  @ApiResponse({ status: 404, description: 'Solicitud no encontrada' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  @ApiParam({ name: 'id', description: 'ID de la solicitud de consentimiento' })
   async findRequest(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ConsentRequestDto> {
@@ -114,19 +166,33 @@ export class ConsentsController {
    * @returns Consentimiento creado
    */
   @Post('requests/:id/respond')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Responde a una solicitud de consentimiento' })
+  @ApiResponse({ status: 200, description: 'Respuesta registrada', type: ConsentRequestAnswerResponseDto })
+  @ApiResponse({ status: 400, description: 'Solicitud inválida o expirada' })
+  @ApiResponse({ status: 404, description: 'Solicitud no encontrada' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  @ApiParam({ name: 'id', description: 'ID de la solicitud de consentimiento' })
   async respondToRequest(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() respondDto: RespondConsentRequestDto,
     @Req() req: Request,
-  ): Promise<ConsentDto> {
+  ): Promise<ConsentRequestAnswerResponseDto> {
     const ipAddress = req.ip || req.socket.remoteAddress;
     const userAgent = req.headers['user-agent'];
 
-    return this.consentsService.respondToRequest(
+    const result = await this.consentsService.respondToRequest(
       id,
       respondDto,
       ipAddress,
       userAgent,
     );
+
+    return {
+      message: 'Respuesta a solicitud de consentimiento registrada correctamente',
+      consentId: result.id,
+      decision: result.status as ConsentStatus,
+      respondedAt: result.createdAt
+    };
   }
 }
