@@ -1,3 +1,4 @@
+import { IsString, IsEnum, IsDateString, IsOptional } from 'class-validator';
 import { AuditAction, ResourceType } from '../../common/audit/audit.service';
 
 /**

@@ -21,11 +21,14 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/enums/user-role.enum';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequireCompanyContext } from '../common/decorators/company-context.decorator';
+import { RequestWithCompanyContext } from '../common/interfaces/company-context.interface';
 
 @ApiTags('data-types')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('data-types')
+@RequireCompanyContext()
 export class DataTypesController {
   constructor(private readonly dataTypesService: DataTypesService) {}
 

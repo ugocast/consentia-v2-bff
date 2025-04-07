@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { createSupabaseClient } from '../config/supabase.config';
 import { CreatePolicyDto, UpdatePolicyDto, PolicyDto, PolicyStatus } from './dto';
 import { AuditService, AuditAction, ResourceType } from '../common/audit/audit.service';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class PoliciesService {
@@ -180,13 +181,13 @@ export class PoliciesService {
       await this.auditService.log({
         action: AuditAction.UPDATE_POLICY,
         resourceType: ResourceType.POLICY,
-        resourceId: data.id,
+        resourceId: uuidv4(),
         userId,
-        previousResourceId: id,
         metadata: {
+          previousPolicyVersion: id,
           title: updatePolicyDto.title,
           companyId: current.companyId,
-        },
+        }
       });
 
       return this.transformToCamelCase(data);
@@ -261,6 +262,7 @@ export class PoliciesService {
         resourceId: id,
         userId,
         metadata: {
+          policyId: id,
           title: current.title,
           companyId: current.companyId,
         },

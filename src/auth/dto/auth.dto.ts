@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength, IsUUID, IsOptional } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail({}, { message: 'Por favor, proporciona un email válido' })
@@ -11,6 +11,10 @@ export class RegisterDto {
   @IsString()
   @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
   password: string;
+  
+  @IsOptional()
+  @IsUUID('4', { message: 'El ID de compañía debe ser un UUID válido' })
+  companyId?: string;
 }
 
 export class LoginDto {

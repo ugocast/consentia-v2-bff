@@ -40,14 +40,14 @@ export function safeValue<T, K extends keyof T>(
 }
 
 /**
- * Convierte un objeto de metadata a una estructura segura
- * @param metadata - Objeto de metadata
- * @returns Metadata como objeto o un objeto vacío si es null/undefined
+ * Convierte un objeto de detalles a una estructura segura
+ * @param details - Objeto de detalles (metadata)
+ * @returns Detalles como objeto o un objeto vacío si es null/undefined
  */
 export function safeMetadata<T extends Record<string, any>>(
-  metadata: T | null | undefined
+  details: T | null | undefined
 ): Record<string, any> {
-  return metadata ?? {};
+  return details ?? {};
 }
 
 /**

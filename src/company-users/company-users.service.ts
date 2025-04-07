@@ -417,10 +417,11 @@ export class CompanyUsersService {
    * @param companyId - ID de la compañía
    * @param id - ID del usuario de compañía
    * @param adminUserId - ID del usuario administrador que elimina el usuario
+   * @returns Usuario de compañía con estado actualizado a DELETED
    * @throws NotFoundException si el usuario no existe
    * @throws Error si hay un problema al eliminar el usuario
    */
-  async remove(companyId: string, id: string, adminUserId: string): Promise<void> {
+  async remove(companyId: string, id: string, adminUserId: string): Promise<CompanyUserDto> {
     try {
       // Obtener usuario actual
       const currentUser = await this.findOne(companyId, id, true);
@@ -430,11 +431,11 @@ export class CompanyUsersService {
       
       // Verificar que no está ya eliminado
       if (currentUser.status === CompanyUserStatus.DELETED) {
-        throw new ConflictException('User is already deleted');
+        throw new ForbiddenException('User is already deleted');
       }
       
       // Cambiar estado a DELETED
-      await this.changeStatus(
+      const updatedUser = await this.changeStatus(
         companyId, 
         id, 
         { status: CompanyUserStatus.DELETED, reason: 'User deleted by administrator' }, 
@@ -453,6 +454,8 @@ export class CompanyUsersService {
           companyId,
         },
       });
+
+      return updatedUser;
     } catch (error) {
       this.logger.error(`Error removing company user: ${error.message}`, error);
       throw error;
@@ -739,5 +742,58 @@ export class CompanyUsersService {
       this.logger.error(`Error fetching user activity: ${error.message}`, error);
       throw error;
     }
+  }
+
+  /**
+   * Obtiene un usuario de compañía por su ID de autenticación y compañía
+   * @param authId - ID de autenticación del usuario
+   * @param companyId - ID de la compañía
+   * @param includeInactive - Si se deben incluir usuarios inactivos
+   * @returns Usuario de compañía encontrado o null si no existe
+   */
+  async findByUserAndCompany(
+    authId: string,
+    companyId: string,
+    includeInactive = false
+  ): Promise<CompanyUserDto | null> {
+    try {
+      // Preparar query
+      let query = this.supabase
+        .from('company_user')
+        .select('*')
+        .eq('auth_id', authId)
+        .eq('company_id', companyId);
+      
+      // Si no se incluyen inactivos, filtrar solo activos
+      if (!includeInactive) {
+        query = query.eq('status', CompanyUserStatus.ACTIVE);
+      } else {
+        // Si se incluyen inactivos, al menos excluir los eliminados
+        query = query.neq('status', CompanyUserStatus.DELETED);
+      }
+      
+      const { data, error } = await query.single();
+
+      if (error || !data) {
+        this.logger.debug(`User with auth ID ${authId} not found in company ${companyId}`);
+        return null;
+      }
+
+      return this.transformToCamelCase(data);
+    } catch (error) {
+      this.logger.error(`Error fetching company user by auth ID: ${error.message}`, error);
+      return null;
+    }
+  }
+  
+  /**
+   * Valida que el usuario existe en la compañía por su ID de autenticación
+   * @param authId - ID de autenticación del usuario
+   * @param companyId - ID de la compañía
+   * @returns Promise<boolean> - true si el usuario existe en la compañía
+   */
+  async validateUserBelongsToCompanyByAuthId(authId: string, companyId: string): Promise<boolean> {
+    const user = await this.findByUserAndCompany(authId, companyId, true);
+    return user !== null;
   }
 }

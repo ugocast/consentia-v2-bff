@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { appConfig } from './config/app.config';
 import * as dotenv from 'dotenv';
@@ -37,8 +38,11 @@ async function bootstrap() {
   // Aplicar filtro de excepciones global
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // Aplicar interceptor de transformación global
-  app.useGlobalInterceptors(new TransformInterceptor());
+  // Aplicar interceptores globales
+  app.useGlobalInterceptors(
+    new TransformInterceptor(),
+    // Se actualizará después de resolver las dependencias del interceptor
+  );
 
   // Habilitar validación global
   app.useGlobalPipes(

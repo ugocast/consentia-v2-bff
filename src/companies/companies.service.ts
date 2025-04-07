@@ -346,10 +346,10 @@ export class CompaniesService {
         .from('company')
         .update({
           subscription_plan: subscriptionDto.plan,
-          subscription_details: {
+          subscription_metadata: {
             start_date: subscriptionDto.start_date,
             end_date: subscriptionDto.end_date,
-            billing_details: subscriptionDto.billing_details,
+            billing_metadata: subscriptionDto.billing_details,
           },
           updated_by: userId,
         })

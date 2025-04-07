@@ -2,27 +2,32 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { UpdateUserDto, UserDto } from './dto/user.dto';
+import { NotFoundException, InternalServerErrorException } from '@nestjs/common';
 
-// Mock del servicio de usuarios
+// Mock del servicio de usuarios siguiendo el patrón AAA
 const mockUsersService = {
   getCurrentUser: jest.fn(),
   updateUser: jest.fn(),
   deleteUser: jest.fn(),
+  getAllUsers: jest.fn(),
 };
 
-// Mock para el decorador User
-jest.mock('./decorators/user.decorator', () => ({
-  User: jest.fn().mockImplementation(() => {
-    return (target: any, key: string, descriptor: PropertyDescriptor) => {
-      return descriptor;
-    };
-  }),
-}));
+// Crear un usuario mock para las pruebas
+const createMockUser = (id = 'user-id', overrides = {}) => ({
+  id,
+  email: `test-${id}@example.com`,
+  name: `Test User ${id}`,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  ...overrides
+});
 
 describe('UsersController', () => {
   let controller: UsersController;
+  let usersService: UsersService;
 
   beforeEach(async () => {
+    // Arrange - Setup
     // Resetear todos los mocks antes de cada prueba
     jest.clearAllMocks();
 
@@ -37,31 +42,24 @@ describe('UsersController', () => {
     }).compile();
 
     controller = module.get<UsersController>(UsersController);
+    usersService = module.get<UsersService>(UsersService);
   });
 
   it('should be defined', () => {
+    // Assert
     expect(controller).toBeDefined();
   });
 
   describe('getCurrentUser', () => {
-    it('should get current user profile', async () => {
+    it('should get current user profile when valid ID is provided', async () => {
       // Arrange
       const userId = 'user-id';
-      const mockUser: UserDto = {
-        id: userId,
+      const mockUser = createMockUser(userId, {
         email: 'test@example.com',
-        name: 'Test User',
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-01T00:00:00Z',
-      };
+        name: 'Test User'
+      });
 
       mockUsersService.getCurrentUser.mockResolvedValue(mockUser);
-
-      // Sobrescribir el método para la prueba
-      const originalMethod = controller.getCurrentUser;
-      controller.getCurrentUser = async (userId: string) => {
-        return mockUsersService.getCurrentUser(userId);
-      };
 
       // Act
       const result = await controller.getCurrentUser(userId);
@@ -69,35 +67,47 @@ describe('UsersController', () => {
       // Assert
       expect(mockUsersService.getCurrentUser).toHaveBeenCalledWith(userId);
       expect(result).toEqual(mockUser);
+    });
 
-      // Restaurar el método original
-      controller.getCurrentUser = originalMethod;
+    it('should throw NotFoundException when user does not exist', async () => {
+      // Arrange
+      const userId = 'non-existent-id';
+      const error = new NotFoundException('Usuario no encontrado');
+      
+      mockUsersService.getCurrentUser.mockRejectedValue(error);
+
+      // Act & Assert
+      await expect(controller.getCurrentUser(userId)).rejects.toThrow(NotFoundException);
+      expect(mockUsersService.getCurrentUser).toHaveBeenCalledWith(userId);
+    });
+
+    it('should propagate other errors from service', async () => {
+      // Arrange
+      const userId = 'error-id';
+      const error = new InternalServerErrorException('Error en el servidor');
+      
+      mockUsersService.getCurrentUser.mockRejectedValue(error);
+
+      // Act & Assert
+      await expect(controller.getCurrentUser(userId)).rejects.toThrow(InternalServerErrorException);
+      expect(mockUsersService.getCurrentUser).toHaveBeenCalledWith(userId);
     });
   });
 
   describe('updateUser', () => {
-    it('should update user profile', async () => {
+    it('should update user profile when valid data is provided', async () => {
       // Arrange
       const userId = 'user-id';
       const updateUserDto: UpdateUserDto = {
         name: 'Updated Name',
       };
 
-      const mockUpdatedUser: UserDto = {
-        id: userId,
-        email: 'test@example.com',
+      const mockUpdatedUser = createMockUser(userId, {
         name: 'Updated Name',
-        created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-02T00:00:00Z',
-      };
+      });
 
       mockUsersService.updateUser.mockResolvedValue(mockUpdatedUser);
-
-      // Sobrescribir el método para la prueba
-      const originalMethod = controller.updateUser;
-      controller.updateUser = async (userId: string, dto: UpdateUserDto) => {
-        return mockUsersService.updateUser(userId, dto);
-      };
 
       // Act
       const result = await controller.updateUser(userId, updateUserDto);
@@ -108,25 +118,84 @@ describe('UsersController', () => {
         updateUserDto,
       );
       expect(result).toEqual(mockUpdatedUser);
+    });
 
-      // Restaurar el método original
-      controller.updateUser = originalMethod;
+    it('should update user email when provided', async () => {
+      // Arrange
+      const userId = 'user-id';
+      const updateUserDto: UpdateUserDto = {
+        email: 'updated@example.com',
+      };
+
+      const mockUpdatedUser = createMockUser(userId, {
+        email: 'updated@example.com',
+        updated_at: '2023-01-02T00:00:00Z',
+      });
+
+      mockUsersService.updateUser.mockResolvedValue(mockUpdatedUser);
+
+      // Act
+      const result = await controller.updateUser(userId, updateUserDto);
+
+      // Assert
+      expect(mockUsersService.updateUser).toHaveBeenCalledWith(
+        userId,
+        updateUserDto,
+      );
+      expect(result.email).toBe(updateUserDto.email);
+    });
+
+    it('should update both name and email when provided together', async () => {
+      // Arrange
+      const userId = 'user-id';
+      const updateUserDto: UpdateUserDto = {
+        name: 'Full Update',
+        email: 'full-update@example.com',
+      };
+
+      const mockUpdatedUser = createMockUser(userId, {
+        name: 'Full Update',
+        email: 'full-update@example.com',
+        updated_at: '2023-01-02T00:00:00Z',
+      });
+
+      mockUsersService.updateUser.mockResolvedValue(mockUpdatedUser);
+
+      // Act
+      const result = await controller.updateUser(userId, updateUserDto);
+
+      // Assert
+      expect(mockUsersService.updateUser).toHaveBeenCalledWith(
+        userId,
+        updateUserDto,
+      );
+      expect(result.name).toBe(updateUserDto.name);
+      expect(result.email).toBe(updateUserDto.email);
+    });
+
+    it('should propagate errors when update fails', async () => {
+      // Arrange
+      const userId = 'user-id';
+      const updateUserDto: UpdateUserDto = {
+        email: 'invalid-email',
+      };
+      const error = new InternalServerErrorException('Error al actualizar email');
+      
+      mockUsersService.updateUser.mockRejectedValue(error);
+
+      // Act & Assert
+      await expect(controller.updateUser(userId, updateUserDto)).rejects.toThrow(InternalServerErrorException);
+      expect(mockUsersService.updateUser).toHaveBeenCalledWith(userId, updateUserDto);
     });
   });
 
   describe('deleteUser', () => {
-    it('should delete user account', async () => {
+    it('should delete user account when valid ID is provided', async () => {
       // Arrange
       const userId = 'user-id';
       const mockResult = { success: true };
 
       mockUsersService.deleteUser.mockResolvedValue(mockResult);
-
-      // Sobrescribir el método para la prueba
-      const originalMethod = controller.deleteUser;
-      controller.deleteUser = async (userId: string) => {
-        return mockUsersService.deleteUser(userId);
-      };
 
       // Act
       const result = await controller.deleteUser(userId);
@@ -134,9 +203,75 @@ describe('UsersController', () => {
       // Assert
       expect(mockUsersService.deleteUser).toHaveBeenCalledWith(userId);
       expect(result).toEqual(mockResult);
+    });
 
-      // Restaurar el método original
-      controller.deleteUser = originalMethod;
+    it('should propagate NotFoundException when user does not exist', async () => {
+      // Arrange
+      const userId = 'non-existent-id';
+      const error = new NotFoundException('Usuario no encontrado');
+      
+      mockUsersService.deleteUser.mockRejectedValue(error);
+
+      // Act & Assert
+      await expect(controller.deleteUser(userId)).rejects.toThrow(NotFoundException);
+      expect(mockUsersService.deleteUser).toHaveBeenCalledWith(userId);
+    });
+
+    it('should propagate other errors when deletion fails', async () => {
+      // Arrange
+      const userId = 'protected-user-id';
+      const error = new InternalServerErrorException('Error al eliminar usuario');
+      
+      mockUsersService.deleteUser.mockRejectedValue(error);
+
+      // Act & Assert
+      await expect(controller.deleteUser(userId)).rejects.toThrow(InternalServerErrorException);
+      expect(mockUsersService.deleteUser).toHaveBeenCalledWith(userId);
+    });
+  });
+
+  describe('getAllUsers', () => {
+    it('should return all users when called by admin', async () => {
+      // Arrange
+      const mockUsers = [
+        createMockUser('user-1', { email: 'user1@example.com', name: 'User One' }),
+        createMockUser('user-2', { email: 'user2@example.com', name: 'User Two' }),
+        createMockUser('user-3', { email: 'user3@example.com', name: 'User Three' }),
+      ];
+
+      mockUsersService.getAllUsers.mockResolvedValue(mockUsers);
+
+      // Act
+      const result = await controller.getAllUsers();
+
+      // Assert
+      expect(mockUsersService.getAllUsers).toHaveBeenCalled();
+      expect(result).toEqual(mockUsers);
+      expect(result.length).toBe(3);
+    });
+
+    it('should return empty array when no users exist', async () => {
+      // Arrange
+      mockUsersService.getAllUsers.mockResolvedValue([]);
+
+      // Act
+      const result = await controller.getAllUsers();
+
+      // Assert
+      expect(mockUsersService.getAllUsers).toHaveBeenCalled();
+      expect(result).toEqual([]);
+      expect(result.length).toBe(0);
+    });
+
+    it('should propagate errors from service', async () => {
+      // Arrange
+      const error = new InternalServerErrorException('Error al obtener usuarios');
+      
+      mockUsersService.getAllUsers.mockRejectedValue(error);
+
+      // Act & Assert
+      await expect(controller.getAllUsers()).rejects.toThrow(InternalServerErrorException);
+      expect(mockUsersService.getAllUsers).toHaveBeenCalled();
     });
   });
 });

@@ -6,6 +6,7 @@ import {
   IsInt,
   Min,
   Max,
+  IsString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { AuditAction, ResourceType } from '../../common/audit/audit.service';

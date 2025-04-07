@@ -6,6 +6,9 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt/jwt.strategy';
 import { appConfig } from '../config/app.config';
 import { UsersModule } from '../users/users.module';
+import { CommonModule } from '../common/common.module';
+import { PermissionsService } from './permissions/permissions.service';
+import { CompanyUsersModule } from '../company-users/company-users.module';
 
 @Module({
   imports: [
@@ -15,9 +18,19 @@ import { UsersModule } from '../users/users.module';
       signOptions: { expiresIn: appConfig.jwt.expiresIn },
     }),
     forwardRef(() => UsersModule),
+    forwardRef(() => CompanyUsersModule),
+    forwardRef(() => CommonModule),
   ],
-  providers: [AuthService, JwtStrategy],
+  providers: [
+    AuthService, 
+    JwtStrategy,
+    PermissionsService
+  ],
   controllers: [AuthController],
-  exports: [AuthService, JwtModule],
+  exports: [
+    AuthService, 
+    JwtModule,
+    PermissionsService
+  ],
 })
 export class AuthModule {}

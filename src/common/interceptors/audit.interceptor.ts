@@ -209,19 +209,19 @@ export class AuditInterceptor implements NestInterceptor {
       const userAgent = request.headers['user-agent'];
       
       // Construir metadata con datos relevantes
-      const metadata: Record<string, any> = {
+      const details: Record<string, any> = {
         url: request.url,
         method: request.method,
       };
       
       // Para operaciones POST, incluir el cuerpo de la solicitud
       if (request.method === 'POST' && request.body) {
-        metadata.requestBody = this.sanitizeBody(request.body);
+        details.requestBody = this.sanitizeBody(request.body);
       }
       
       // Para operaciones que retornan datos, incluir ID de recurso creado
       if (responseData && responseData.id) {
-        metadata.resultId = responseData.id;
+        details.resultId = responseData.id;
       }
       
       // Registrar el evento
@@ -230,7 +230,7 @@ export class AuditInterceptor implements NestInterceptor {
         resourceType,
         resourceId,
         userId: userId || 'anonymous',
-        metadata,
+        details,
         ipAddress,
         userAgent,
       });

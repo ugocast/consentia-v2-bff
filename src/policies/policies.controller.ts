@@ -10,6 +10,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import { PoliciesService } from './policies.service';
 import { 
@@ -30,11 +31,14 @@ import { UserRole } from '../users/enums/user-role.enum';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { RequireCompanyContext } from '../common/decorators/company-context.decorator';
+import { RequestWithCompanyContext } from '../common/interfaces/company-context.interface';
 
 @ApiTags('policies')
 @ApiBearerAuth()
 @Controller('policies')
 @UseGuards(JwtAuthGuard)
+@RequireCompanyContext()
 export class PoliciesController {
   constructor(private readonly policiesService: PoliciesService) {}
 

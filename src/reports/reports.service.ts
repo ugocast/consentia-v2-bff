@@ -204,8 +204,10 @@ export class ReportsService {
         resourceType: item.resource_type,
         resourceId: item.resource_id,
         userId: item.user_id,
-        previousResourceId: item.previous_resource_id,
-        metadata: item.metadata,
+        metadata: {
+          ...item.details,
+          previousResourceId: item.previous_resource_id
+        },
         ipAddress: item.ip_address,
         userAgent: item.user_agent,
         createdAt: item.created_at,

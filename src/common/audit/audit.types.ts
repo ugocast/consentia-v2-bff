@@ -14,6 +14,12 @@ export enum AuditAction {
   REGISTER = 'REGISTER',
   RESET_PASSWORD = 'RESET_PASSWORD',
   CHANGE_PASSWORD = 'CHANGE_PASSWORD',
+  SET_ACTIVE_COMPANY = 'SET_ACTIVE_COMPANY',
+  CREATE_COMPANY_USER = 'CREATE_COMPANY_USER',
+  UPDATE_COMPANY_USER = 'UPDATE_COMPANY_USER',
+  DELETE_COMPANY_USER = 'DELETE_COMPANY_USER',
+  CHANGE_USER_STATUS = 'CHANGE_USER_STATUS',
+  CHANGE_USER_ROLE = 'CHANGE_USER_ROLE',
 }
 
 /**
@@ -25,6 +31,8 @@ export enum ResourceType {
   CONSENT = 'CONSENT',
   REPORT = 'REPORT',
   SYSTEM = 'SYSTEM',
+  COMPANY = 'COMPANY',
+  COMPANY_USER = 'COMPANY_USER',
 }
 
 /**
@@ -39,6 +47,7 @@ export interface AuditLogFilters {
   endDate?: string;
   page?: number;
   limit?: number;
+  companyId?: string;
 }
 
 /**
@@ -67,4 +76,5 @@ export interface AuditLog {
   userId: string;
   timestamp: string;
   details?: AuditDetails;
+  companyId?: string;
 }

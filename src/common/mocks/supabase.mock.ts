@@ -1,254 +1,192 @@
 import { jest } from '@jest/globals';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Definir interfaces para los tipos de respuesta de Supabase
-interface SupabaseResponse<T = any> {
+/**
+ * Tipos específicos para las respuestas de Supabase
+ */
+export interface SupabaseResponse<T = any> {
   data: T | null;
   error: { message: string } | null;
   count?: number;
 }
 
-// Interfaces para los tipos de autenticación
-interface AuthResponse {
-  data: {
-    user: any;
-    session: any;
-  } | null;
-  error: { message: string } | null;
-}
-
-interface UserResponse {
-  data: {
-    user: any;
-  } | null;
-  error: { message: string } | null;
-}
-
-interface SignOutResponse {
-  error: { message: string } | null;
-}
-
-interface AdminUserResponse {
-  data: {
-    user: any;
-  } | null;
-  error: { message: string } | null;
-}
-
-// Crear un mock para el cliente de Supabase
-export const mockSupabaseClient = {
+// Tipos para los mocks de Supabase
+export interface MockSupabaseClient {
+  from: any;
+  select: any;
+  insert: any;
+  update: any;
+  delete: any;
+  limit: any;
+  where: any;
+  values: any;
+  returning: any;
+  execute: any;
+  single: any;
+  order: any;
+  range: any;
+  count: any;
+  eq: any;
+  neq: any;
+  is: any;
+  in: any;
+  gte: any;
+  lte: any;
+  contains: any;
+  then?: any;
   auth: {
-    signUp: jest.fn<() => Promise<AuthResponse>>().mockImplementation(() =>
-      Promise.resolve({
-        data: { user: null, session: null },
-        error: null,
-      }),
-    ),
-    signInWithPassword: jest
-      .fn<() => Promise<AuthResponse>>()
-      .mockImplementation(() =>
-        Promise.resolve({
-          data: { user: null, session: null },
-          error: null,
-        }),
-      ),
-    signOut: jest
-      .fn<() => Promise<SignOutResponse>>()
-      .mockImplementation(() => Promise.resolve({ error: null })),
-    resetPasswordForEmail: jest
-      .fn<() => Promise<SignOutResponse>>()
-      .mockImplementation(() => Promise.resolve({ error: null })),
-    updateUser: jest
-      .fn<() => Promise<SignOutResponse>>()
-      .mockImplementation(() => Promise.resolve({ error: null })),
-    getUser: jest
-      .fn<() => Promise<UserResponse>>()
-      .mockImplementation(() =>
-        Promise.resolve({ data: { user: null }, error: null }),
-      ),
-    refreshSession: jest
-      .fn<() => Promise<AuthResponse>>()
-      .mockImplementation(() =>
-        Promise.resolve({
-          data: { user: null, session: null },
-          error: null,
-        }),
-      ),
+    signUp: any;
+    signInWithPassword: any;
+    signOut: any;
+    getUser: any;
+    setSession: any;
+    resetPasswordForEmail: any;
+    updateUser: any;
+    refreshSession: any;
+  };
+  // Propiedades adicionales para compatibilidad con SupabaseClient
+  supabaseUrl?: string;
+  supabaseKey?: string;
+  realtime?: any;
+  realtimeUrl?: string;
+  authUrl?: string;
+  storageUrl?: string;
+  functionsUrl?: string;
+  rest?: any;
+  // Otras propiedades adicionales para compatibilidad con SupabaseClient
+  storageKey?: string;
+  headers?: any;
+  schema?: any;
+  getChannels?: any;
+  removeChannel?: any;
+  removeAllChannels?: any;
+  listBuckets?: any;
+  fetchRelease?: any;
+  // Otras propiedades adicionales
+  channel?: any;
+  storage?: any;
+  rpc?: any;
+  functions?: any;
+  queryBuilder?: any;
+}
+
+// Cliente mock de Supabase
+export const mockSupabaseClient: MockSupabaseClient = {
+  from: jest.fn().mockReturnThis(),
+  select: jest.fn().mockReturnThis(),
+  insert: jest.fn().mockReturnThis(),
+  update: jest.fn().mockReturnThis(),
+  delete: jest.fn().mockReturnThis(),
+  limit: jest.fn().mockReturnThis(),
+  where: jest.fn().mockReturnThis(),
+  values: jest.fn().mockReturnThis(),
+  returning: jest.fn().mockReturnThis(),
+  execute: jest.fn(),
+  single: jest.fn().mockReturnThis(),
+  order: jest.fn().mockReturnThis(),
+  range: jest.fn().mockReturnThis(),
+  count: jest.fn(),
+  eq: jest.fn().mockReturnThis(),
+  neq: jest.fn().mockReturnThis(),
+  is: jest.fn().mockReturnThis(),
+  in: jest.fn().mockReturnThis(),
+  gte: jest.fn().mockReturnThis(),
+  lte: jest.fn().mockReturnThis(),
+  contains: jest.fn().mockReturnThis(),
+  auth: {
+    signUp: jest.fn(),
+    signInWithPassword: jest.fn(),
+    signOut: jest.fn(),
+    getUser: jest.fn(),
     setSession: jest.fn(),
-    admin: {
-      getUserById: jest
-        .fn<() => Promise<AdminUserResponse>>()
-        .mockImplementation(() =>
-          Promise.resolve({ data: { user: null }, error: null }),
-        ),
-      updateUserById: jest
-        .fn<() => Promise<AdminUserResponse>>()
-        .mockImplementation(() =>
-          Promise.resolve({ data: { user: null }, error: null }),
-        ),
-      deleteUser: jest
-        .fn<() => Promise<SignOutResponse>>()
-        .mockImplementation(() => Promise.resolve({ error: null })),
-    },
+    resetPasswordForEmail: jest.fn(),
+    updateUser: jest.fn(),
+    refreshSession: jest.fn(),
   },
-  from: jest.fn(),
-  select: jest.fn(),
-  insert: jest.fn(),
-  update: jest.fn(),
-  delete: jest.fn(),
-  eq: jest.fn(),
-  neq: jest.fn(),
-  gt: jest.fn(),
-  gte: jest.fn(),
-  lt: jest.fn(),
-  lte: jest.fn(),
-  in: jest.fn(),
-  is: jest.fn(),
-  order: jest.fn(),
-  range: jest.fn().mockImplementation(() => {
-    return {
-      then: (callback) =>
-        callback({
-          data: [],
-          error: null,
-          count: 0,
-        }),
-    };
-  }),
-  single: jest.fn().mockImplementation(() => {
-    return {
-      then: (callback) =>
-        callback({
-          data: {},
-          error: null,
-        }),
-    };
-  }),
-  count: jest.fn().mockImplementation(() => {
-    return {
-      then: (callback) =>
-        callback({
-          data: 0,
-          error: null,
-        }),
-    };
-  }),
-  then: jest.fn(),
-  storage: {
-    from: jest.fn().mockReturnValue({
-      upload: jest.fn(),
-      getPublicUrl: jest.fn(),
-      remove: jest.fn(),
-    }),
-  },
-  rpc: jest.fn(),
+  // Valores para las propiedades de compatibilidad
+  supabaseUrl: 'https://example.com',
+  supabaseKey: 'test-key',
+  realtime: {},
+  realtimeUrl: 'wss://example.com',
+  authUrl: 'https://example.com/auth',
+  storageUrl: 'https://example.com/storage',
+  functionsUrl: 'https://example.com/functions',
+  rest: {},
+  // Propiedades adicionales de compatibilidad
+  storageKey: 'test-storage-key',
+  headers: {},
+  schema: 'public',
+  getChannels: jest.fn(),
+  removeChannel: jest.fn(),
+  removeAllChannels: jest.fn(),
+  listBuckets: jest.fn(),
+  fetchRelease: jest.fn(),
+  // Valores para otras propiedades
+  channel: {},
+  storage: {},
+  rpc: jest.fn().mockReturnThis(),
+  functions: {},
+  queryBuilder: {},
 };
 
-// Asegurarse de que cada método devuelva el propio cliente para permitir encadenamiento
-Object.keys(mockSupabaseClient).forEach((key) => {
-  if (typeof mockSupabaseClient[key] === 'function' && key !== 'then') {
-    mockSupabaseClient[key].mockReturnValue(mockSupabaseClient);
-  }
-});
-
-// Mock para la función createSupabaseClient
-export const mockCreateSupabaseClient = jest
-  .fn()
-  .mockReturnValue(mockSupabaseClient);
-
-// Función auxiliar para configurar respuestas de Supabase
-export function setupSupabaseResponse<T = any>(
-  response: SupabaseResponse<T>,
-): void {
-  mockSupabaseClient.then.mockImplementation(() => Promise.resolve(response));
+// Funciones de utilidad para configurar resultados
+export function setupSupabaseQueryResult(data: any, error: any = null) {
+  mockSupabaseClient.execute.mockImplementation(() => Promise.resolve({ data, error }));
 }
 
-// Función auxiliar para configurar respuestas de error de Supabase
-export function setupSupabaseError(errorMessage: string): void {
-  setupSupabaseResponse({
-    data: null,
-    error: { message: errorMessage },
-  });
+export function setupSupabaseError(error: any) {
+  mockSupabaseClient.execute.mockImplementation(() => Promise.resolve({ data: null, error }));
 }
 
-// Función auxiliar para configurar respuestas de éxito de Supabase
-export function setupSupabaseSuccess<T = any>(data: T): void {
-  setupSupabaseResponse({
-    data,
-    error: null,
-  });
-}
-
-// Función auxiliar para configurar respuestas de éxito con conteo
-export function setupSupabaseSuccessWithCount<T = any>(
-  data: T,
-  count: number,
-): void {
-  setupSupabaseResponse({
-    data,
-    error: null,
-    count,
-  });
-}
-
-// Función auxiliar para resetear todos los mocks
-export function resetSupabaseMocks(): void {
-  jest.clearAllMocks();
+// Función para resetear los mocks
+export function resetSupabaseMocks() {
+  // Limpiar todos los mocks
   Object.keys(mockSupabaseClient).forEach((key) => {
-    if (typeof mockSupabaseClient[key] === 'function') {
+    if (key === 'auth') {
+      Object.keys(mockSupabaseClient.auth).forEach((authKey) => {
+        mockSupabaseClient.auth[authKey].mockReset();
+      });
+    } else if (typeof mockSupabaseClient[key] === 'function') {
       mockSupabaseClient[key].mockClear();
     }
   });
 
-  // Restaurar el comportamiento de encadenamiento
-  Object.keys(mockSupabaseClient).forEach((key) => {
-    if (typeof mockSupabaseClient[key] === 'function' && key !== 'then') {
-      mockSupabaseClient[key].mockReturnValue(mockSupabaseClient);
-    }
-  });
-
-  // Restaurar implementaciones por defecto para métodos de auth
-  mockSupabaseClient.auth.signUp.mockImplementation(() =>
-    Promise.resolve({
-      data: { user: null, session: null },
-      error: null,
-    }),
-  );
-  mockSupabaseClient.auth.signInWithPassword.mockImplementation(() =>
-    Promise.resolve({
-      data: { user: null, session: null },
-      error: null,
-    }),
-  );
-  mockSupabaseClient.auth.signOut.mockImplementation(() =>
-    Promise.resolve({ error: null }),
-  );
-  mockSupabaseClient.auth.resetPasswordForEmail.mockImplementation(() =>
-    Promise.resolve({ error: null }),
-  );
-  mockSupabaseClient.auth.updateUser.mockImplementation(() =>
-    Promise.resolve({ error: null }),
-  );
-  mockSupabaseClient.auth.getUser.mockImplementation(() =>
-    Promise.resolve({ data: { user: null }, error: null }),
-  );
-  mockSupabaseClient.auth.refreshSession.mockImplementation(() =>
-    Promise.resolve({
-      data: { user: null, session: null },
-      error: null,
-    }),
-  );
-  mockSupabaseClient.auth.admin.getUserById.mockImplementation(() =>
-    Promise.resolve({ data: { user: null }, error: null }),
-  );
-  mockSupabaseClient.auth.admin.updateUserById.mockImplementation(() =>
-    Promise.resolve({ data: { user: null }, error: null }),
-  );
-  mockSupabaseClient.auth.admin.deleteUser.mockImplementation(() =>
-    Promise.resolve({ error: null }),
-  );
+  // Restablecer comportamiento por defecto
+  mockSupabaseClient.from.mockReturnThis();
+  mockSupabaseClient.select.mockReturnThis();
+  mockSupabaseClient.insert.mockReturnThis();
+  mockSupabaseClient.update.mockReturnThis();
+  mockSupabaseClient.delete.mockReturnThis();
+  mockSupabaseClient.limit.mockReturnThis();
+  mockSupabaseClient.where.mockReturnThis();
+  mockSupabaseClient.values.mockReturnThis();
+  mockSupabaseClient.returning.mockReturnThis();
+  mockSupabaseClient.single.mockReturnThis();
+  mockSupabaseClient.order.mockReturnThis();
+  mockSupabaseClient.range.mockReturnThis();
+  mockSupabaseClient.eq.mockReturnThis();
+  mockSupabaseClient.neq.mockReturnThis();
+  mockSupabaseClient.is.mockReturnThis();
+  mockSupabaseClient.in.mockReturnThis();
+  mockSupabaseClient.gte.mockReturnThis();
+  mockSupabaseClient.lte.mockReturnThis();
+  mockSupabaseClient.contains.mockReturnThis();
+  
+  // Usar implementaciones en lugar de ResolvedValue
+  mockSupabaseClient.execute.mockImplementation(() => Promise.resolve({ data: [], error: null }));
+  mockSupabaseClient.count.mockImplementation(() => Promise.resolve({ data: [], error: null }));
 }
 
-// Mock para el módulo de configuración de Supabase
-jest.mock('../../config/supabase.config', () => ({
-  createSupabaseClient: mockCreateSupabaseClient,
+// Función para verificar una consulta
+export function expectSupabaseQuery(table: string, operation: string) {
+  expect(mockSupabaseClient.from).toHaveBeenCalledWith(table);
+  expect(mockSupabaseClient[operation as keyof MockSupabaseClient]).toHaveBeenCalled();
+}
+
+// Mock de la función createClient con tipado explícito para evitar errores
+export const mockCreateSupabaseClient = jest.fn(() => mockSupabaseClient as unknown as SupabaseClient<any, "public", any>);
+
+// Reemplazar la implementación real de createClient
+jest.mock('@supabase/supabase-js', () => ({
+  createClient: mockCreateSupabaseClient,
 }));

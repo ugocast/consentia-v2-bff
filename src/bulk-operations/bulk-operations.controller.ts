@@ -10,7 +10,8 @@ import {
   HttpCode,
   HttpStatus,
   Query,
-  ParseUUIDPipe
+  ParseUUIDPipe,
+  Req
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { BulkOperationsService } from './bulk-operations.service';
@@ -20,6 +21,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/enums/user-role.enum';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequireCompanyContext } from '../common/decorators/company-context.decorator';
+import { RequestWithCompanyContext } from '../common/interfaces/company-context.interface';
 
 /**
  * Controlador para gestionar operaciones masivas
@@ -30,6 +33,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('companies/:companyId/bulk-operations')
+@RequireCompanyContext({ requireInParams: true })
 export class BulkOperationsController {
   constructor(private readonly bulkOperationsService: BulkOperationsService) {}
 

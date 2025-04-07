@@ -39,11 +39,14 @@ import { UserRole } from '../users/enums/user-role.enum';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { RequireCompanyContext, SkipCompanyContext } from '../common/decorators/company-context.decorator';
+import { RequestWithCompanyContext } from '../common/interfaces/company-context.interface';
 
 @ApiTags('data-subjects')
 @ApiBearerAuth()
 @Controller('data-subjects')
 @UseGuards(JwtAuthGuard)
+@RequireCompanyContext()
 export class DataSubjectsController {
   constructor(private readonly dataSubjectsService: DataSubjectsService) {}
 
@@ -70,6 +73,7 @@ export class DataSubjectsController {
 
   /**
    * Obtiene todos los titulares de datos con filtros opcionales
+   * @param req Request with company context
    * @param companyId ID de la compañía (opcional)
    * @param status Estado del titular (opcional)
    * @returns Lista de titulares de datos
@@ -82,9 +86,14 @@ export class DataSubjectsController {
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 403, description: 'Prohibido' })
   async findAll(
+    @Req() req: RequestWithCompanyContext,
     @Query('companyId') companyId?: string,
     @Query('status') status?: DataSubjectStatus,
   ): Promise<DataSubjectDto[]> {
+    // Si no se especifica companyId, usar el del contexto de empresa
+    if (!companyId && req.companyContext) {
+      companyId = req.companyContext.companyId;
+    }
     return this.dataSubjectsService.findAll(companyId, status);
   }
 
@@ -108,6 +117,8 @@ export class DataSubjectsController {
   /**
    * Busca un titular de datos por su email
    * @param email Email del titular de datos
+   * @param req Request with company context
+   * @param companyId ID de la compañía (opcional)
    * @returns Titular de datos
    */
   @Get('by-email/:email')
@@ -119,11 +130,21 @@ export class DataSubjectsController {
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 403, description: 'Prohibido' })
   @ApiResponse({ status: 404, description: 'Titular no encontrado' })
-  async findByEmail(@Param('email') email: string): Promise<DataSubjectDto> {
+  async findByEmail(
+    @Param('email') email: string,
+    @Req() req: RequestWithCompanyContext,
+    @Query('companyId') companyId?: string,
+  ): Promise<DataSubjectDto> {
     if (!email) {
       throw new BadRequestException('El email es requerido');
     }
-    return this.dataSubjectsService.findByEmail(email);
+
+    // Si no se especifica companyId, usar el del contexto
+    if (!companyId && req.companyContext) {
+      companyId = req.companyContext.companyId;
+    }
+
+    return this.dataSubjectsService.findByEmail(email, companyId);
   }
 
   /**
@@ -189,6 +210,7 @@ export class DataSubjectsController {
   @ApiResponse({ status: 200, description: 'Solicitud procesada', type: PortalAccessResponseDto })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 404, description: 'Email no encontrado' })
+  @SkipCompanyContext()
   async requestPortalAccess(
     @Body() portalAccessRequestDto: PortalAccessRequestDto,
   ): Promise<PortalAccessResponseDto> {
@@ -206,6 +228,7 @@ export class DataSubjectsController {
   @ApiResponse({ status: 200, description: 'Token verificado', type: PortalVerificationResponseDto })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 401, description: 'Token inválido o expirado' })
+  @SkipCompanyContext()
   async verifyPortalAccess(
     @Body() portalVerificationDto: PortalVerificationDto,
   ): Promise<PortalVerificationResponseDto> {
@@ -222,6 +245,7 @@ export class DataSubjectsController {
   @ApiResponse({ status: 200, description: 'Historial obtenido', type: [ConsentHistoryDto] })
   @ApiResponse({ status: 400, description: 'ID inválido' })
   @ApiResponse({ status: 404, description: 'Titular no encontrado' })
+  @SkipCompanyContext()
   async getConsentHistory(
     @Param('dataSubjectId', ParseUUIDPipe) dataSubjectId: string,
   ): Promise<ConsentHistoryDto[]> {
@@ -238,6 +262,7 @@ export class DataSubjectsController {
   @ApiResponse({ status: 200, description: 'Preferencias obtenidas', type: ConsentPreferencesDto })
   @ApiResponse({ status: 400, description: 'ID inválido' })
   @ApiResponse({ status: 404, description: 'Titular no encontrado' })
+  @SkipCompanyContext()
   async getConsentPreferences(
     @Param('dataSubjectId', ParseUUIDPipe) dataSubjectId: string,
   ): Promise<ConsentPreferencesDto> {
@@ -260,6 +285,7 @@ export class DataSubjectsController {
   @ApiResponse({ status: 200, description: 'Solicitud procesada', type: ArcoRequestResponseDto })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 404, description: 'Titular no encontrado' })
+  @SkipCompanyContext()
   async requestDataDeletion(
     @Param('dataSubjectId', ParseUUIDPipe) dataSubjectId: string,
     @Body() dataDeletionRequestDto: DataDeletionRequestDto,
@@ -282,6 +308,7 @@ export class DataSubjectsController {
   @ApiResponse({ status: 200, description: 'Datos obtenidos', type: DataAccessResponseDto })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 404, description: 'Titular no encontrado' })
+  @SkipCompanyContext()
   async requestDataAccess(
     @Param('dataSubjectId', ParseUUIDPipe) dataSubjectId: string,
     @Body() dataAccessRequestDto: DataAccessRequestDto,
@@ -304,6 +331,7 @@ export class DataSubjectsController {
   @ApiResponse({ status: 200, description: 'Solicitud procesada', type: ArcoRequestResponseDto })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 404, description: 'Titular no encontrado' })
+  @SkipCompanyContext()
   async requestDataRectification(
     @Param('dataSubjectId', ParseUUIDPipe) dataSubjectId: string,
     @Body() dataRectificationRequestDto: DataRectificationRequestDto,

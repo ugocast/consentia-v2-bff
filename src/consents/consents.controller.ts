@@ -31,13 +31,15 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/enums/user-role.enum';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe';
-import { Request } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { RequireCompanyContext, SkipCompanyContext } from '../common/decorators/company-context.decorator';
+import { RequestWithCompanyContext } from '../common/interfaces/company-context.interface';
 
 @ApiTags('consents')
 @ApiBearerAuth()
 @Controller('consents')
 @UseGuards(JwtAuthGuard)
+@RequireCompanyContext()
 export class ConsentsController {
   constructor(private readonly consentsService: ConsentsService) {}
 
@@ -57,10 +59,14 @@ export class ConsentsController {
   @ApiQuery({ name: 'dataSubjectId', required: false, description: 'ID del titular de datos' })
   @ApiQuery({ name: 'status', required: false, enum: ConsentStatus, description: 'Estado del consentimiento' })
   async findAll(
+    @Req() req: RequestWithCompanyContext,
     @Query('companyId') companyId?: string,
     @Query('dataSubjectId') dataSubjectId?: string,
     @Query('status') status?: ConsentStatus,
   ): Promise<ConsentDto[]> {
+    if (!companyId && req.companyContext) {
+      companyId = req.companyContext.companyId;
+    }
     return this.consentsService.findAll(companyId, dataSubjectId, status);
   }
 
@@ -97,6 +103,7 @@ export class ConsentsController {
   @ApiResponse({ status: 404, description: 'Consentimiento no encontrado' })
   @ApiResponse({ status: 500, description: 'Error interno del servidor' })
   @ApiParam({ name: 'id', description: 'ID del consentimiento' })
+  @RequireCompanyContext({ requireRoles: [UserRole.ADMIN, UserRole.MANAGER] })
   async updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateStatusDto: UpdateConsentStatusDto,
@@ -128,6 +135,7 @@ export class ConsentsController {
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 403, description: 'Prohibido' })
   @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  @RequireCompanyContext({ requireRoles: [UserRole.ADMIN, UserRole.MANAGER] })
   async createRequest(
     @Body() createRequestDto: CreateConsentRequestDto,
     @CurrentUser('id') userId: string,
@@ -152,6 +160,7 @@ export class ConsentsController {
   @ApiResponse({ status: 404, description: 'Solicitud no encontrada' })
   @ApiResponse({ status: 500, description: 'Error interno del servidor' })
   @ApiParam({ name: 'id', description: 'ID de la solicitud de consentimiento' })
+  @RequireCompanyContext()
   async findRequest(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ConsentRequestDto> {
@@ -173,13 +182,14 @@ export class ConsentsController {
   @ApiResponse({ status: 404, description: 'Solicitud no encontrada' })
   @ApiResponse({ status: 500, description: 'Error interno del servidor' })
   @ApiParam({ name: 'id', description: 'ID de la solicitud de consentimiento' })
+  @SkipCompanyContext()
   async respondToRequest(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() respondDto: RespondConsentRequestDto,
-    @Req() req: Request,
+    @Req() req: RequestWithCompanyContext,
   ): Promise<ConsentRequestAnswerResponseDto> {
-    const ipAddress = req.ip || req.socket.remoteAddress;
-    const userAgent = req.headers['user-agent'];
+    const ipAddress = req.ip || (req.socket?.remoteAddress as string) || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
 
     const result = await this.consentsService.respondToRequest(
       id,

@@ -8,6 +8,7 @@ import {
   Put,
   UseGuards,
   Query,
+  Req,
 } from '@nestjs/common';
 import { ConsentDataTypesService } from './consent-data-types.service';
 import {
@@ -21,11 +22,14 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/enums/user-role.enum';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { RequireCompanyContext } from '../common/decorators/company-context.decorator';
+import { RequestWithCompanyContext } from '../common/interfaces/company-context.interface';
 
 @ApiTags('consent-data-types')
 @ApiBearerAuth()
 @Controller('consent-data-types')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@RequireCompanyContext()
 export class ConsentDataTypesController {
   constructor(private readonly consentDataTypesService: ConsentDataTypesService) {}
 

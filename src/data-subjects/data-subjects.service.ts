@@ -200,15 +200,22 @@ export class DataSubjectsService {
   /**
    * Encuentra un titular de datos por su email
    * @param email - Email del titular de datos
+   * @param companyId - ID de la compañía para filtrar (opcional)
    * @returns Titular de datos encontrado
    */
-  async findByEmail(email: string): Promise<DataSubjectDto> {
+  async findByEmail(email: string, companyId?: string): Promise<DataSubjectDto> {
     try {
-      const { data, error } = await this.supabase
+      let query = this.supabase
         .from('data_subject')
         .select('*')
-        .eq('email', email)
-        .single();
+        .eq('email', email);
+
+      // Si se proporciona companyId, filtrar por esa empresa
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      const { data, error } = await query.single();
 
       if (error) {
         this.logger.error(`Error al buscar titular de datos por email: ${error.message}`, error);

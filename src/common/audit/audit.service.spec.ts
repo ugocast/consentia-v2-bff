@@ -15,30 +15,23 @@ const mockSupabaseLte = jest.fn();
 const mockSupabaseOrder = jest.fn();
 const mockSupabaseRange = jest.fn();
 const mockSupabaseFrom = jest.fn();
+const mockSupabaseContains = jest.fn();
+
+// Configurar los mocks para que devuelvan ellos mismos para permitir encadenamiento
+const baseQueryMock = {
+  eq: mockSupabaseEq,
+  gte: mockSupabaseGte,
+  lte: mockSupabaseLte,
+  order: mockSupabaseOrder,
+  contains: mockSupabaseContains,
+};
 
 // Mock del módulo de configuración de Supabase
 jest.mock('../../config/supabase.config', () => ({
   createSupabaseClient: jest.fn().mockImplementation(() => ({
     from: mockSupabaseFrom.mockImplementation(() => ({
       insert: mockSupabaseInsert,
-      select: mockSupabaseSelect.mockImplementation(() => ({
-        eq: mockSupabaseEq.mockImplementation(() => ({
-          eq: mockSupabaseEq,
-          gte: mockSupabaseGte,
-          lte: mockSupabaseLte,
-          order: mockSupabaseOrder,
-        })),
-        gte: mockSupabaseGte.mockImplementation(() => ({
-          lte: mockSupabaseLte,
-          order: mockSupabaseOrder,
-        })),
-        lte: mockSupabaseLte.mockImplementation(() => ({
-          order: mockSupabaseOrder,
-        })),
-        order: mockSupabaseOrder.mockImplementation(() => ({
-          range: mockSupabaseRange,
-        })),
-      })),
+      select: mockSupabaseSelect.mockImplementation(() => baseQueryMock),
     })),
   })),
 }));
@@ -49,6 +42,13 @@ describe('AuditService', () => {
   beforeEach(async () => {
     // Resetear todos los mocks antes de cada prueba
     jest.clearAllMocks();
+
+    // Configurar todos los mocks para que devuelvan el objeto base para permitir encadenamiento
+    mockSupabaseEq.mockReturnValue(baseQueryMock);
+    mockSupabaseGte.mockReturnValue(baseQueryMock);
+    mockSupabaseLte.mockReturnValue(baseQueryMock);
+    mockSupabaseContains.mockReturnValue(baseQueryMock);
+    mockSupabaseOrder.mockReturnValue({ range: mockSupabaseRange });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [AuditService],
@@ -69,7 +69,7 @@ describe('AuditService', () => {
         resourceType: ResourceType.POLICY,
         resourceId: 'policy-1',
         userId: 'user-1',
-        metadata: { title: 'New Policy' },
+        details: { title: 'New Policy' },
       };
 
       // Configurar el mock para devolver una respuesta exitosa
@@ -85,13 +85,11 @@ describe('AuditService', () => {
       expect(mockSupabaseFrom).toHaveBeenCalledWith('audit_log');
       expect(mockSupabaseInsert).toHaveBeenCalledWith({
         action: auditEntry.action,
-        resource_type: auditEntry.resourceType,
-        resource_id: auditEntry.resourceId,
-        user_id: auditEntry.userId,
-        previous_resource_id: undefined,
-        metadata: auditEntry.metadata,
-        ip_address: undefined,
-        user_agent: undefined,
+        company_user_id: undefined,
+        data_subject_id: undefined,
+        ip_address: '',
+        action_at: expect.any(String),
+        details: auditEntry.details,
       });
     });
 
@@ -102,7 +100,7 @@ describe('AuditService', () => {
         resourceType: ResourceType.POLICY,
         resourceId: 'policy-1',
         userId: 'user-1',
-        // No metadata provided
+        // No details provided
       };
 
       // Configurar el mock para devolver una respuesta exitosa
@@ -118,13 +116,11 @@ describe('AuditService', () => {
       expect(mockSupabaseFrom).toHaveBeenCalledWith('audit_log');
       expect(mockSupabaseInsert).toHaveBeenCalledWith({
         action: auditEntry.action,
-        resource_type: auditEntry.resourceType,
-        resource_id: auditEntry.resourceId,
-        user_id: auditEntry.userId,
-        previous_resource_id: undefined,
-        metadata: undefined,
-        ip_address: undefined,
-        user_agent: undefined,
+        company_user_id: undefined,
+        data_subject_id: undefined,
+        ip_address: '',
+        action_at: expect.any(String),
+        details: {},
       });
     });
 
@@ -163,6 +159,7 @@ describe('AuditService', () => {
       const filters = {
         userId: 'user-1',
         resourceType: ResourceType.POLICY,
+        resourceId: 'policy-1',
         startDate: '2023-01-01',
         endDate: '2023-12-31',
       };
@@ -173,20 +170,24 @@ describe('AuditService', () => {
         {
           id: 'audit-1',
           action: AuditAction.CREATE_POLICY,
-          resource_type: ResourceType.POLICY,
-          resource_id: 'policy-1',
-          user_id: 'user-1',
-          created_at: '2023-06-15T10:30:00Z',
-          metadata: { title: 'New Policy' },
+          details: { 
+            resourceType: ResourceType.POLICY,
+            resourceId: 'policy-1',
+            title: 'New Policy'
+          },
+          company_user_id: 'user-1',
+          action_at: '2023-06-15T10:30:00Z',
         },
         {
           id: 'audit-2',
           action: AuditAction.UPDATE_POLICY,
-          resource_type: ResourceType.POLICY,
-          resource_id: 'policy-2',
-          user_id: 'user-1',
-          created_at: '2023-06-16T10:30:00Z',
-          metadata: { title: 'Another Policy' },
+          details: { 
+            resourceType: ResourceType.POLICY,
+            resourceId: 'policy-2',
+            title: 'Another Policy'
+          },
+          company_user_id: 'user-1',
+          action_at: '2023-06-16T10:30:00Z',
         },
       ];
 
@@ -203,20 +204,12 @@ describe('AuditService', () => {
       // Assert
       expect(mockSupabaseFrom).toHaveBeenCalledWith('audit_log');
       expect(mockSupabaseSelect).toHaveBeenCalledWith('*', { count: 'exact' });
-      expect(mockSupabaseEq).toHaveBeenCalledWith('user_id', filters.userId);
-      expect(mockSupabaseEq).toHaveBeenCalledWith(
-        'resource_type',
-        filters.resourceType,
-      );
-      expect(mockSupabaseGte).toHaveBeenCalledWith(
-        'created_at',
-        filters.startDate,
-      );
-      expect(mockSupabaseLte).toHaveBeenCalledWith(
-        'created_at',
-        filters.endDate,
-      );
-      expect(mockSupabaseOrder).toHaveBeenCalledWith('created_at', {
+      expect(mockSupabaseEq).toHaveBeenCalledWith('company_user_id', filters.userId);
+      expect(mockSupabaseContains).toHaveBeenCalledWith('details', { resourceType: filters.resourceType });
+      expect(mockSupabaseContains).toHaveBeenCalledWith('details', { resourceId: filters.resourceId });
+      expect(mockSupabaseGte).toHaveBeenCalledWith('action_at', filters.startDate);
+      expect(mockSupabaseLte).toHaveBeenCalledWith('action_at', filters.endDate);
+      expect(mockSupabaseOrder).toHaveBeenCalledWith('action_at', {
         ascending: false,
       });
       expect(mockSupabaseRange).toHaveBeenCalledWith(

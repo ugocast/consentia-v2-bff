@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CompaniesService } from './companies.service';
@@ -25,6 +26,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/enums/user-role.enum';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequireCompanyContext, SkipCompanyContext } from '../common/decorators/company-context.decorator';
+import { RequestWithCompanyContext } from '../common/interfaces/company-context.interface';
 
 @ApiTags('companies')
 @ApiBearerAuth()
@@ -46,6 +49,7 @@ export class CompaniesController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
+  @SkipCompanyContext() // Para administradores globales, no requiere contexto de empresa
   async findAll(): Promise<Company[]> {
     return this.companiesService.findAll();
   }
@@ -65,6 +69,7 @@ export class CompaniesController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Company not found' })
+  @RequireCompanyContext({ requireInParams: true })
   async findOne(
     @Param('id') id: string,
   ): Promise<Company> {
@@ -87,6 +92,7 @@ export class CompaniesController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
+  @SkipCompanyContext() // Creación de nueva empresa, no requiere contexto
   async create(
     @Body() createCompanyDto: CreateCompanyDto,
     @CurrentUser('id') userId: string,

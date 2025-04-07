@@ -49,6 +49,7 @@ export enum AuditAction {
   DEACTIVATE_COMPANY = 'deactivate_company',
   UPDATE_COMPANY_CONFIG = 'update_company_config',
   UPDATE_COMPANY_SUBSCRIPTION = 'update_company_subscription',
+  SET_ACTIVE_COMPANY = 'set_active_company',
 
   // Acciones de política
   CREATE_POLICY = 'create_policy',
@@ -153,10 +154,12 @@ export interface AuditLogEntry {
   resourceType: ResourceType;
   resourceId: string;
   userId?: string;
-  previousResourceId?: string;
-  metadata?: Record<string, any>;
+  companyUserId?: string;
+  dataSubjectId?: string;
   ipAddress?: string;
   userAgent?: string;
+  details?: Record<string, any>;
+  metadata?: Record<string, any>; // Para mantener compatibilidad con el código existente
 }
 
 /**
@@ -174,13 +177,11 @@ export class AuditService {
     try {
       const { error } = await this.supabase.from('audit_log').insert({
         action: entry.action,
-        resource_type: entry.resourceType,
-        resource_id: entry.resourceId,
-        user_id: entry.userId,
-        previous_resource_id: entry.previousResourceId,
-        metadata: entry.metadata,
-        ip_address: entry.ipAddress,
-        user_agent: entry.userAgent,
+        company_user_id: entry.companyUserId,
+        data_subject_id: entry.dataSubjectId,
+        ip_address: entry.ipAddress || '',
+        action_at: new Date().toISOString(),
+        details: entry.details || entry.metadata || {}
       });
 
       if (error) {
@@ -218,16 +219,21 @@ export class AuditService {
         .from('audit_log')
         .select('*', { count: 'exact' });
 
+      // Filtrar por company_user_id asociado al userId si es necesario
       if (userId) {
-        query = query.eq('user_id', userId);
+        // Nota: Hay que ajustar esto según cómo se relacione el userId con company_user_id
+        // Esta es una implementación simplificada, puede necesitar una consulta más compleja
+        query = query.eq('company_user_id', userId);
       }
 
+      // Los siguientes filtros deberían ser aplicados contra el campo details
+      // ya que resourceType, resourceId, etc. no existen directamente en la tabla
       if (resourceType) {
-        query = query.eq('resource_type', resourceType);
+        query = query.contains('details', { resourceType });
       }
 
       if (resourceId) {
-        query = query.eq('resource_id', resourceId);
+        query = query.contains('details', { resourceId });
       }
 
       if (action) {
@@ -235,15 +241,15 @@ export class AuditService {
       }
 
       if (startDate) {
-        query = query.gte('created_at', startDate);
+        query = query.gte('action_at', startDate);
       }
 
       if (endDate) {
-        query = query.lte('created_at', endDate);
+        query = query.lte('action_at', endDate);
       }
 
       const { data, error, count } = await query
-        .order('created_at', { ascending: false })
+        .order('action_at', { ascending: false })
         .range(offset, offset + pageSize - 1);
 
       if (error) {
@@ -290,22 +296,22 @@ export class AuditService {
         actionValue = String(event.action).toLowerCase();
     }
 
-    // Mapear de ResourceType de audit.types (mayúsculas) a ResourceType de audit.service (minúsculas)
-    let resourceTypeValue: string;
-    switch (event.resourceType) {
-      case 'USER':
-        resourceTypeValue = ResourceType.USER;
-        break;
-      default:
-        resourceTypeValue = String(event.resourceType).toLowerCase();
-    }
+    // Incluir los campos de resourceType y resourceId en el campo details
+    const details = {
+      ...event.details,
+      resourceType: event.resourceType,
+      resourceId: event.resourceId
+    };
 
     return this.log({
       action: actionValue as any,
-      resourceType: resourceTypeValue as any,
-      resourceId: event.resourceId,
-      userId: event.userId,
-      metadata: event.details
+      // No podemos usar resourceType directamente, ya que no existe en el schema
+      // Vamos a almacenar esta información en el campo details
+      resourceType: null as any, // Este campo no se usará en la inserción
+      resourceId: '', // Este campo no se usará en la inserción
+      companyUserId: event.userId, // Asumiendo que userId es un company_user_id
+      ipAddress: '',
+      details
     });
   }
 }

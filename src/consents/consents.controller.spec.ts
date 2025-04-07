@@ -8,10 +8,14 @@ import {
   RespondConsentRequestDto,
   UpdateConsentStatusDto,
   ConsentStatus,
-  ConsentResponseType,
+  ConsentWithDetailsDto,
+  ConsentStatusResponseDto,
+  ConsentRequestResponseDto,
+  ConsentRequestAnswerResponseDto
 } from './dto';
-import { JwtGuard } from '../auth/jwt/jwt.guard';
-import { Request } from 'express';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RequestWithCompanyContext } from '../common/interfaces/company-context.interface';
+import { PolicyDto } from '../policies/dto';
 
 // Mock del servicio de consentimientos
 const mockConsentsService = {
@@ -20,6 +24,7 @@ const mockConsentsService = {
   createRequest: jest.fn(),
   respondToRequest: jest.fn(),
   updateStatus: jest.fn(),
+  findRequest: jest.fn(),
 };
 
 // Mock del guard de autenticación
@@ -42,7 +47,7 @@ describe('ConsentsController', () => {
         },
       ],
     })
-      .overrideGuard(JwtGuard)
+      .overrideGuard(JwtAuthGuard)
       .useValue(mockJwtAuthGuard)
       .compile();
 
@@ -60,23 +65,31 @@ describe('ConsentsController', () => {
       const mockConsents: ConsentDto[] = [
         {
           id: 'consent-1',
-          legal_policy_id: 'policy-1',
-          data_subject_id: 'user-1',
-          consent_request_id: 'request-1',
+          legalPolicyId: 'policy-1',
+          dataSubjectId: 'user-1',
+          consentRequestId: 'request-1',
           status: ConsentStatus.GRANTED,
-          created_at: '2023-01-01T00:00:00Z',
-          updated_at: '2023-01-01T00:00:00Z',
-          expires_at: '2024-01-01T00:00:00Z',
+          createdAt: '2023-01-01T00:00:00Z',
+          updatedAt: '2023-01-01T00:00:00Z',
+          expiresAt: '2024-01-01T00:00:00Z',
         },
       ];
 
       mockConsentsService.findAll.mockResolvedValue(mockConsents);
 
+      // Mock de la solicitud con contexto de compañía
+      const mockRequest = {
+        companyContext: {
+          companyId: 'company-1',
+          role: 'admin'
+        }
+      } as unknown as RequestWithCompanyContext;
+
       // Act
-      const result = await controller.findAll();
+      const result = await controller.findAll(mockRequest);
 
       // Assert
-      expect(service.findAll).toHaveBeenCalled();
+      expect(service.findAll).toHaveBeenCalledWith('company-1', undefined, undefined);
       expect(result).toEqual(mockConsents);
     });
 
@@ -86,23 +99,31 @@ describe('ConsentsController', () => {
       const mockConsents: ConsentDto[] = [
         {
           id: 'consent-1',
-          legal_policy_id: legalPolicyId,
-          data_subject_id: 'user-1',
-          consent_request_id: 'request-1',
+          legalPolicyId: legalPolicyId,
+          dataSubjectId: 'user-1',
+          consentRequestId: 'request-1',
           status: ConsentStatus.GRANTED,
-          created_at: '2023-01-01T00:00:00Z',
-          updated_at: '2023-01-01T00:00:00Z',
-          expires_at: '2024-01-01T00:00:00Z',
+          createdAt: '2023-01-01T00:00:00Z',
+          updatedAt: '2023-01-01T00:00:00Z',
+          expiresAt: '2024-01-01T00:00:00Z',
         },
       ];
 
       mockConsentsService.findAll.mockResolvedValue(mockConsents);
 
+      // Mock de la solicitud con contexto de compañía
+      const mockRequest = {
+        companyContext: {
+          companyId: 'company-1',
+          role: 'admin'
+        }
+      } as unknown as RequestWithCompanyContext;
+
       // Act
-      const result = await controller.findAll(legalPolicyId);
+      const result = await controller.findAll(mockRequest, legalPolicyId);
 
       // Assert
-      expect(service.findAll).toHaveBeenCalledWith(legalPolicyId, undefined);
+      expect(service.findAll).toHaveBeenCalledWith(legalPolicyId, undefined, undefined);
       expect(result).toEqual(mockConsents);
     });
 
@@ -112,23 +133,31 @@ describe('ConsentsController', () => {
       const mockConsents: ConsentDto[] = [
         {
           id: 'consent-1',
-          legal_policy_id: 'policy-1',
-          data_subject_id: dataSubjectId,
-          consent_request_id: 'request-1',
+          legalPolicyId: 'policy-1',
+          dataSubjectId: dataSubjectId,
+          consentRequestId: 'request-1',
           status: ConsentStatus.GRANTED,
-          created_at: '2023-01-01T00:00:00Z',
-          updated_at: '2023-01-01T00:00:00Z',
-          expires_at: '2024-01-01T00:00:00Z',
+          createdAt: '2023-01-01T00:00:00Z',
+          updatedAt: '2023-01-01T00:00:00Z',
+          expiresAt: '2024-01-01T00:00:00Z',
         },
       ];
 
       mockConsentsService.findAll.mockResolvedValue(mockConsents);
 
+      // Mock de la solicitud con contexto de compañía
+      const mockRequest = {
+        companyContext: {
+          companyId: 'company-1',
+          role: 'admin'
+        }
+      } as unknown as RequestWithCompanyContext;
+
       // Act
-      const result = await controller.findAll(undefined, dataSubjectId);
+      const result = await controller.findAll(mockRequest, undefined, dataSubjectId);
 
       // Assert
-      expect(service.findAll).toHaveBeenCalledWith(undefined, dataSubjectId);
+      expect(service.findAll).toHaveBeenCalledWith('company-1', dataSubjectId, undefined);
       expect(result).toEqual(mockConsents);
     });
   });
@@ -137,15 +166,29 @@ describe('ConsentsController', () => {
     it('should return a consent by id', async () => {
       // Arrange
       const consentId = 'consent-1';
-      const mockConsent: ConsentDto = {
+      const mockConsent: ConsentWithDetailsDto = {
         id: consentId,
-        legal_policy_id: 'policy-1',
-        data_subject_id: 'user-1',
-        consent_request_id: 'request-1',
+        legalPolicyId: 'policy-1',
+        dataSubjectId: 'user-1',
+        consentRequestId: 'request-1',
         status: ConsentStatus.GRANTED,
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-01T00:00:00Z',
-        expires_at: '2024-01-01T00:00:00Z',
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
+        expiresAt: '2024-01-01T00:00:00Z',
+        legalPolicy: {
+          id: 'policy-1',
+          title: 'Privacy Policy',
+          content: 'Content of privacy policy',
+          companyId: 'company-1',
+          validFrom: '2023-01-01T00:00:00Z',
+          createdAt: '2023-01-01T00:00:00Z',
+          updatedAt: '2023-01-01T00:00:00Z'
+        },
+        dataSubject: {
+          id: 'user-1',
+          email: 'user@example.com',
+          name: 'Test User'
+        }
       };
 
       mockConsentsService.findOne.mockResolvedValue(mockConsent);
@@ -159,7 +202,7 @@ describe('ConsentsController', () => {
     });
   });
 
-  describe('createConsentRequest', () => {
+  describe('createRequest', () => {
     it('should create a new consent request', async () => {
       // Arrange
       const userId = 'user-1';
@@ -171,96 +214,91 @@ describe('ConsentsController', () => {
         expiresAt: '2024-01-01T00:00:00Z',
       };
 
-      const mockRequest: ConsentRequestDto = {
+      const mockResult: ConsentRequestDto = {
         id: 'request-1',
-        legal_policy_id: createConsentRequestDto.legalPolicyId,
-        data_subject_id: 'user-2',
-        company_id: 'company-1',
+        legalPolicyId: createConsentRequestDto.legalPolicyId,
+        dataSubjectId: 'user-2',
+        companyId: 'company-1',
         status: 'PENDING',
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-01T00:00:00Z',
-        expires_at: createConsentRequestDto.expiresAt,
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
+        expiresAt: createConsentRequestDto.expiresAt,
       };
 
-      mockConsentsService.createRequest.mockResolvedValue(mockRequest);
+      const expectedResponse: ConsentRequestResponseDto = {
+        message: 'Solicitud de consentimiento creada correctamente',
+        requestId: mockResult.id,
+        responseUrl: `https://app.consentia.io/consents/respond/${mockResult.id}`,
+        expiresAt: mockResult.expiresAt
+      };
 
-      // Mock de la solicitud con el usuario autenticado
-      const mockRequest1 = {
-        user: { id: userId },
-      } as unknown as Request;
+      mockConsentsService.createRequest.mockResolvedValue(mockResult);
 
       // Act
-      const result = await controller.createRequest(
-        createConsentRequestDto,
-        mockRequest1,
-      );
+      const result = await controller.createRequest(createConsentRequestDto, userId);
 
       // Assert
-      expect(service.createRequest).toHaveBeenCalledWith(
-        createConsentRequestDto,
-        userId,
-      );
-      expect(result).toEqual(mockRequest);
+      expect(service.createRequest).toHaveBeenCalledWith(createConsentRequestDto, userId);
+      expect(result).toEqual(expectedResponse);
     });
   });
 
-  describe('respondToConsentRequest', () => {
+  describe('respondToRequest', () => {
     it('should respond to a consent request', async () => {
       // Arrange
       const requestId = 'request-1';
-      const userId = 'user-2';
       const respondDto: RespondConsentRequestDto = {
         accepted: true,
-        response: ConsentResponseType.ACCEPT,
+        acceptedDataTypeIds: ['datatype-1', 'datatype-2'],
+        metadata: {
+          ip_address: '192.168.1.1',
+          user_agent: 'Mozilla/5.0'
+        }
       };
 
-      const mockResponse = {
-        request: {
-          id: requestId,
-          legal_policy_id: 'policy-1',
-          data_subject_id: userId,
-          requested_by: 'user-1',
-          status: 'ACCEPTED',
-          created_at: '2023-01-01T00:00:00Z',
-          updated_at: '2023-01-02T00:00:00Z',
-          expires_at: '2024-01-01T00:00:00Z',
-        },
-        consent: {
-          id: 'consent-1',
-          legal_policy_id: 'policy-1',
-          data_subject_id: userId,
-          status: ConsentStatus.GRANTED,
-          created_at: '2023-01-02T00:00:00Z',
-          updated_at: '2023-01-02T00:00:00Z',
-          expires_at: '2024-01-01T00:00:00Z',
-        },
+      const mockConsent: ConsentDto = {
+        id: 'consent-1',
+        legalPolicyId: 'policy-1',
+        dataSubjectId: 'user-2',
+        consentRequestId: requestId,
+        status: ConsentStatus.GRANTED,
+        createdAt: '2023-01-02T00:00:00Z',
+        updatedAt: '2023-01-02T00:00:00Z',
+        expiresAt: '2024-01-01T00:00:00Z',
       };
 
-      mockConsentsService.respondToRequest.mockResolvedValue(mockResponse);
+      const expectedResponse: ConsentRequestAnswerResponseDto = {
+        message: 'Respuesta a solicitud de consentimiento registrada correctamente',
+        consentId: mockConsent.id,
+        decision: mockConsent.status,
+        respondedAt: mockConsent.createdAt
+      };
 
-      // Mock de la solicitud con el usuario autenticado
-      const mockRequest1 = {
-        user: { id: userId },
-      } as unknown as Request;
+      mockConsentsService.respondToRequest.mockResolvedValue(mockConsent);
+
+      // Mock de la solicitud HTTP
+      const mockRequest = {
+        ip: '192.168.1.1',
+        headers: {
+          'user-agent': 'Mozilla/5.0'
+        },
+      } as unknown as RequestWithCompanyContext;
 
       // Act
-      const result = await controller.respondToRequest(
-        requestId,
-        respondDto,
-        mockRequest1,
-      );
+      const result = await controller.respondToRequest(requestId, respondDto, mockRequest);
 
       // Assert
       expect(service.respondToRequest).toHaveBeenCalledWith(
         requestId,
         respondDto,
-        userId,
+        '192.168.1.1',
+        'Mozilla/5.0'
       );
-      expect(result).toEqual(mockResponse);
+      expect(result).toEqual(expectedResponse);
     });
   });
 
-  describe('updateConsentStatus', () => {
+  describe('updateStatus', () => {
     it('should update consent status', async () => {
       // Arrange
       const consentId = 'consent-1';
@@ -269,38 +307,59 @@ describe('ConsentsController', () => {
         status: ConsentStatus.REVOKED,
       };
 
-      const mockUpdatedConsent: ConsentDto = {
+      const oldConsent: ConsentWithDetailsDto = {
         id: consentId,
-        legal_policy_id: 'policy-1',
-        data_subject_id: userId,
-        consent_request_id: 'request-1',
+        legalPolicyId: 'policy-1',
+        dataSubjectId: userId,
+        consentRequestId: 'request-1',
         status: ConsentStatus.GRANTED,
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-02T00:00:00Z',
-        expires_at: '2024-01-01T00:00:00Z',
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
+        expiresAt: '2024-01-01T00:00:00Z',
+        legalPolicy: {
+          id: 'policy-1',
+          title: 'Privacy Policy',
+          content: 'Content of privacy policy',
+          companyId: 'company-1',
+          validFrom: '2023-01-01T00:00:00Z',
+          createdAt: '2023-01-01T00:00:00Z',
+          updatedAt: '2023-01-01T00:00:00Z'
+        },
+        dataSubject: {
+          id: 'user-1',
+          email: 'user@example.com',
+          name: 'Test User'
+        }
       };
 
-      mockConsentsService.updateStatus.mockResolvedValue(mockUpdatedConsent);
+      const updatedConsent: ConsentDto = {
+        id: consentId,
+        legalPolicyId: 'policy-1',
+        dataSubjectId: userId,
+        consentRequestId: 'request-1',
+        status: ConsentStatus.REVOKED,
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-02T00:00:00Z',
+        expiresAt: '2024-01-01T00:00:00Z',
+      };
 
-      // Mock de la solicitud con el usuario autenticado
-      const mockRequest1 = {
-        user: { id: userId },
-      } as unknown as Request;
+      const expectedResponse: ConsentStatusResponseDto = {
+        message: 'Estado del consentimiento actualizado correctamente',
+        id: updatedConsent.id,
+        previousStatus: oldConsent.status,
+        currentStatus: updatedConsent.status,
+        updatedAt: updatedConsent.updatedAt
+      };
+
+      mockConsentsService.findOne.mockResolvedValue(oldConsent);
+      mockConsentsService.updateStatus.mockResolvedValue(updatedConsent);
 
       // Act
-      const result = await controller.updateStatus(
-        consentId,
-        updateDto,
-        mockRequest1,
-      );
+      const result = await controller.updateStatus(consentId, updateDto, userId);
 
       // Assert
-      expect(service.updateStatus).toHaveBeenCalledWith(
-        consentId,
-        updateDto,
-        userId,
-      );
-      expect(result).toEqual(mockUpdatedConsent);
+      expect(service.updateStatus).toHaveBeenCalledWith(consentId, updateDto, userId);
+      expect(result).toEqual(expectedResponse);
     });
   });
 });
