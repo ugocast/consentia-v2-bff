@@ -1,17 +1,23 @@
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { createSupabaseClient } from '../config/supabase.config';
-import { UpdateUserDto, UserDto } from './dto/user.dto';
+import { UpdateUserDto, UserDto, CreateUserCompanyDto, UserCompanyResponseDto } from './dto';
 import { SelectActiveCompanyDto, ActiveCompanyResponseDto } from './dto/select-active-company.dto';
 import { ErrorCode } from '../common/interfaces/error-types.interface';
 import { AuditService } from '../common/audit/audit.service';
 import { AuditAction, ResourceType } from '../common/audit/audit.types';
+import { CompaniesService } from '../companies/companies.service';
+import { CreateCompanyDto } from '../companies/dto';
+import { CompanyUserRole, CompanyUserStatus } from '../company-users/dto';
 
 @Injectable()
 export class UsersService {
   private supabase = createSupabaseClient();
   private supabaseAdmin = createSupabaseClient({ useServiceKey: true });
 
-  constructor(private readonly auditService: AuditService) {}
+  constructor(
+    private readonly auditService: AuditService,
+    private readonly companiesService: CompaniesService
+  ) {}
 
   /**
    * Obtiene el perfil del usuario actual
@@ -227,6 +233,123 @@ export class UsersService {
       throw new InternalServerErrorException({
         code: ErrorCode.UNKNOWN_ERROR,
         message: 'Error inesperado al establecer la compañía activa',
+        metadata: { originalError: error.message },
+      });
+    }
+  }
+
+  /**
+   * Crea una nueva empresa para un usuario registrado
+   * @param userId ID del usuario que crea la empresa
+   * @param createUserCompanyDto DTO con los datos para crear la empresa
+   * @returns Respuesta con los datos de la empresa y el usuario
+   */
+  async createUserCompany(
+    userId: string,
+    createUserCompanyDto: CreateUserCompanyDto,
+  ): Promise<UserCompanyResponseDto> {
+    try {
+      // 1. Obtener datos del usuario
+      const user = await this.getCurrentUser(userId);
+      
+      // 2. Transformar DTO a formato esperado por CompaniesService
+      const createCompanyDto: CreateCompanyDto = {
+        name: createUserCompanyDto.name,
+        description: createUserCompanyDto.description,
+        contact_email: createUserCompanyDto.contactEmail,
+        phone: createUserCompanyDto.phone,
+        address: createUserCompanyDto.address,
+        subscription_plan: createUserCompanyDto.subscriptionPlan,
+        metadata: createUserCompanyDto.metadata,
+      };
+      
+      // 3. Crear la empresa
+      const company = await this.companiesService.create(createCompanyDto, userId);
+      
+      // 4. Crear el vínculo company_user con rol ADMINISTRATOR
+      const now = new Date().toISOString();
+      
+      const { data: companyUserData, error: companyUserError } = await this.supabase
+        .from('company_user')
+        .insert({
+          company_id: company.id,
+          auth_id: userId,
+          full_name: user.name,
+          email: user.email,
+          role: CompanyUserRole.ADMINISTRATOR,
+          status: CompanyUserStatus.ACTIVE,
+          created_at: now,
+          updated_at: now,
+          created_by: userId,
+        })
+        .select()
+        .single();
+      
+      if (companyUserError) {
+        // Si hay error al crear company_user, intentamos eliminar la empresa creada
+        try {
+          await this.supabase.from('company').delete().eq('id', company.id);
+        } catch (deleteError) {
+          console.error('Error al eliminar empresa tras fallar creación de company_user:', deleteError);
+        }
+        
+        throw new InternalServerErrorException({
+          code: ErrorCode.DATABASE_ERROR,
+          message: 'Error al crear el vínculo entre usuario y empresa',
+          metadata: { originalError: companyUserError.message },
+        });
+      }
+      
+      // 5. Establecer la empresa como activa
+      await this.setActiveCompany(userId, { companyId: company.id });
+      
+      // 6. Actualizar metadatos del usuario para reflejar onboarding completado
+      const { error: updateUserError } = await this.supabaseAdmin.auth.admin.updateUserById(
+        userId,
+        {
+          user_metadata: {
+            active_company_id: company.id,
+            onboarding_status: 'ONBOARDING_COMPLETED'
+          },
+        }
+      );
+
+      if (updateUserError) {
+        console.error('Error al actualizar metadatos de usuario:', updateUserError.message);
+        // No fallamos la operación por este error
+      }
+      
+      // 7. Registrar en auditoría
+      await this.auditService.log({
+        action: AuditAction.CREATE_COMPANY,
+        resourceType: ResourceType.COMPANY,
+        resourceId: company.id,
+        userId,
+        metadata: {
+          companyName: company.name,
+          userName: user.name,
+          userEmail: user.email,
+        },
+      });
+      
+      // 8. Devolver respuesta
+      return {
+        success: true,
+        message: 'Empresa creada correctamente',
+        companyId: company.id,
+        companyName: company.name,
+        subscriptionPlan: company.subscription_plan,
+        companyUserId: companyUserData.id,
+        role: CompanyUserRole.ADMINISTRATOR,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof InternalServerErrorException) {
+        throw error;
+      }
+      
+      throw new InternalServerErrorException({
+        code: ErrorCode.UNKNOWN_ERROR,
+        message: 'Error inesperado al crear empresa para el usuario',
         metadata: { originalError: error.message },
       });
     }

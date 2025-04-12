@@ -21,6 +21,16 @@ export enum AuditAction {
   CHANGE_USER_STATUS = 'CHANGE_USER_STATUS',
   CHANGE_USER_ROLE = 'CHANGE_USER_ROLE',
   EMAIL_VERIFIED = 'EMAIL_VERIFIED',
+  UPDATE_PROFILE = 'update_profile',
+  REQUEST_PASSWORD_RESET = 'request_password_reset',
+  DELETE_ACCOUNT = 'delete_account',
+  CREATE_COMPANY = 'create_company',
+  UPDATE_COMPANY = 'update_company',
+  DELETE_COMPANY = 'delete_company',
+  UPDATE_COMPANY_CONFIG = 'update_company_config',
+  UPDATE_COMPANY_SUBSCRIPTION = 'update_company_subscription',
+  CHANGE_COMPANY_USER_ROLE = 'change_company_user_role',
+  CHANGE_COMPANY_USER_STATUS = 'change_company_user_status',
 }
 
 /**
@@ -34,6 +44,9 @@ export enum ResourceType {
   SYSTEM = 'SYSTEM',
   COMPANY = 'COMPANY',
   COMPANY_USER = 'COMPANY_USER',
+  DATA_SUBJECT = 'data_subject',
+  LEGAL_POLICY = 'legal_policy',
+  INVITATION = 'invitation',
 }
 
 /**

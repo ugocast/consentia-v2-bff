@@ -7,6 +7,7 @@ import {
   UseGuards,
   Put,
   Param,
+  Post,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -16,6 +17,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from './enums/user-role.enum';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UpdateUserDto, UserDto } from './dto/user.dto';
+import { CreateUserCompanyDto } from './dto/create-user-company.dto';
+import { UserCompanyResponseDto } from './dto/user-company-response.dto';
 import { SelectActiveCompanyDto, ActiveCompanyResponseDto } from './dto/select-active-company.dto';
 import { SkipCompanyContext } from '../common/decorators/company-context.decorator';
 
@@ -97,5 +100,23 @@ export class UsersController {
     @Body() selectActiveCompanyDto: SelectActiveCompanyDto,
   ): Promise<ActiveCompanyResponseDto> {
     return this.usersService.setActiveCompany(user.id, selectActiveCompanyDto);
+  }
+
+  @Post('me/companies')
+  @ApiOperation({ summary: 'Crear una nueva empresa para el usuario actual' })
+  @ApiResponse({
+    status: 201,
+    description: 'Empresa creada exitosamente',
+    type: UserCompanyResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  @SkipCompanyContext()
+  async createUserCompany(
+    @CurrentUser() user: any,
+    @Body() createUserCompanyDto: CreateUserCompanyDto,
+  ): Promise<UserCompanyResponseDto> {
+    return this.usersService.createUserCompany(user.id, createUserCompanyDto);
   }
 }

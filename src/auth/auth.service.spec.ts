@@ -46,6 +46,11 @@ mockSupabaseClient.auth = {
   admin: {
     getUserById: jest.fn(),
     generateLink: jest.fn(),
+    updateUserById: jest.fn(),
+    deleteUser: jest.fn(),
+    listUsers: jest.fn(),
+    createUser: jest.fn(),
+    inviteUserByEmail: jest.fn(),
   },
 };
 
@@ -53,6 +58,10 @@ mockSupabaseClient.auth = {
 jest.mock('../config/supabase.config', () => ({
   createSupabaseClient: jest.fn(),
 }));
+
+// Mock para createSupabaseClient
+const mockCreateSupabaseClient = jest.fn().mockReturnValue(mockSupabaseClient);
+supabaseConfig.createSupabaseClient = mockCreateSupabaseClient;
 
 describe('AuthService', () => {
   let service: AuthService;

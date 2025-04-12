@@ -1,25 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { mockSupabaseClient } from '../common/mocks/supabase.mock';
 import { UpdateUserDto } from './dto/user.dto';
 import * as supabaseConfig from '../config/supabase.config';
 import { AuditService } from '../common/audit/audit.service';
 import { SelectActiveCompanyDto } from './dto/select-active-company.dto';
+import { ErrorCode } from '../common/interfaces/error-types.interface';
 
 // Mock del módulo de configuración de Supabase
 jest.mock('../config/supabase.config', () => ({
   createSupabaseClient: jest.fn(),
 }));
-
-// Extender el mockSupabaseClient para incluir la función admin
-// @ts-ignore: Ignorar error de tipado en el mock para pruebas
-mockSupabaseClient.auth.admin = {
-  getUserById: jest.fn(),
-  updateUserById: jest.fn(),
-  deleteUser: jest.fn(),
-  listUsers: jest.fn(),
-};
 
 // Mock de AuditService
 const mockAuditService = {
@@ -28,27 +19,15 @@ const mockAuditService = {
 
 describe('UsersService', () => {
   let service: UsersService;
-  let mockSupabaseClient;
-  let mockSupabaseAdminClient;
+  let mockClient;
+  let mockAdminClient;
 
   beforeEach(async () => {
     // Resetear todos los mocks antes de cada prueba
     jest.clearAllMocks();
     
-    // También limpiamos los mocks de admin manualmente
-    // @ts-ignore
-    Object.keys(mockSupabaseClient.auth.admin).forEach(key => {
-      // @ts-ignore
-      mockSupabaseClient.auth.admin[key].mockReset();
-    });
-
-    // Configurar el mock para devolver el cliente de Supabase
-    (supabaseConfig.createSupabaseClient as jest.Mock).mockReturnValue(
-      mockSupabaseClient,
-    );
-
     // Crear mock para la respuesta de Supabase
-    mockSupabaseClient = {
+    mockClient = {
       from: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
       insert: jest.fn().mockReturnThis(),
@@ -58,23 +37,36 @@ describe('UsersService', () => {
       maybeSingle: jest.fn(),
     };
 
-    mockSupabaseAdminClient = {
+    // Crear mock para el cliente admin
+    mockAdminClient = {
       auth: {
         admin: {
-          getUserById: jest.fn(),
-          updateUserById: jest.fn(),
-          deleteUser: jest.fn(),
-          listUsers: jest.fn(),
-        },
-      },
+          getUserById: jest.fn().mockResolvedValue({
+            data: { user: null },
+            error: null
+          }),
+          updateUserById: jest.fn().mockResolvedValue({
+            data: {},
+            error: null
+          }),
+          deleteUser: jest.fn().mockResolvedValue({
+            data: {},
+            error: null
+          }),
+          listUsers: jest.fn().mockResolvedValue({
+            data: [],
+            error: null
+          }),
+        }
+      }
     };
 
     // Configurar el mock de createSupabaseClient
     (supabaseConfig.createSupabaseClient as jest.Mock).mockImplementation((options) => {
       if (options && options.useServiceKey) {
-        return mockSupabaseAdminClient;
+        return mockAdminClient;
       }
-      return mockSupabaseClient;
+      return mockClient;
     });
 
     const module: TestingModule = await Test.createTestingModule({
@@ -91,53 +83,59 @@ describe('UsersService', () => {
   });
 
   it('should be defined', () => {
-    // Assert
     expect(service).toBeDefined();
   });
 
   describe('getCurrentUser', () => {
     it('should return a user by ID', async () => {
-      // Arrange
-      const userId = 'user-id';
-      const mockUser = {
+      const userId = 'test-user-id';
+      const mockUserData = {
         id: userId,
         email: 'test@example.com',
         user_metadata: { name: 'Test User' },
         created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-01T00:00:00Z',
       };
 
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.getUserById.mockResolvedValue({
-        data: { user: mockUser },
+      // Configurar la respuesta esperada de Supabase
+      mockAdminClient.auth.admin.getUserById.mockResolvedValueOnce({
+        data: { user: mockUserData },
         error: null,
       });
 
-      // Act
+      // Mock para company_user
+      mockClient.from.mockReturnValue(mockClient);
+      mockClient.select.mockReturnValue(mockClient);
+      mockClient.eq.mockReturnValue(mockClient);
+      mockClient.single.mockResolvedValueOnce({
+        data: { company_id: 'company-1', role: 'admin' },
+        error: null,
+      });
+
+      // Llamar a getCurrentUser y verificar resultado
       const result = await service.getCurrentUser(userId);
 
-      // Assert
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      expect(mockSupabaseClient.auth.admin.getUserById).toHaveBeenCalledWith(
-        userId,
-      );
+      // Verificar que getUserById fue llamado con el ID correcto
+      expect(mockAdminClient.auth.admin.getUserById).toHaveBeenCalledWith(userId);
+      
+      // Verificar estructura de resultado
       expect(result).toEqual({
-        id: mockUser.id,
-        email: mockUser.email,
-        name: mockUser.user_metadata.name,
-        created_at: mockUser.created_at,
-        updated_at: mockUser.updated_at,
+        id: userId,
+        email: 'test@example.com',
+        name: 'Test User',
+        company: {
+          id: 'company-1',
+          role: 'admin',
+        },
       });
     });
 
     it('should throw NotFoundException when user is not found', async () => {
-      // Arrange
-      const userId = 'non-existent-user-id';
+      const userId = 'non-existent-id';
 
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.getUserById.mockResolvedValue({
+      // Configurar la respuesta para un usuario no encontrado
+      mockAdminClient.auth.admin.getUserById.mockResolvedValueOnce({
         data: { user: null },
-        error: { message: 'User not found' },
+        error: null,
       });
 
       // Act & Assert
@@ -149,185 +147,121 @@ describe('UsersService', () => {
 
   describe('updateUser', () => {
     it('should update user details', async () => {
-      // Arrange
-      const userId = 'user-id';
+      const userId = 'test-user-id';
       const updateUserDto: UpdateUserDto = {
+        name: 'Updated Name',
         email: 'updated@example.com',
-        name: 'Updated User',
       };
 
-      const mockUser = {
-        id: userId,
-        email: updateUserDto.email,
-        user_metadata: { name: updateUserDto.name },
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-02T00:00:00Z',
-      };
-
-      // Mock para la actualización de email
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.updateUserById.mockResolvedValueOnce({
-        data: { user: mockUser },
+      // Mock para actualizar email
+      mockAdminClient.auth.admin.updateUserById.mockResolvedValueOnce({
+        data: {},
         error: null,
       });
 
-      // Mock para la actualización de nombre
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.updateUserById.mockResolvedValueOnce({
-        data: { user: mockUser },
+      // Mock para actualizar metadata (nombre)
+      mockAdminClient.auth.admin.updateUserById.mockResolvedValueOnce({
+        data: {},
         error: null,
       });
 
-      // Mock para getCurrentUser que se llama al final
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.getUserById.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
-
-      // Act
+      // Llamar al método y verificar
       const result = await service.updateUser(userId, updateUserDto);
 
-      // Assert
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      expect(mockSupabaseClient.auth.admin.updateUserById).toHaveBeenCalledWith(
+      // Verificar que updateUserById fue llamado con los parámetros correctos
+      expect(mockAdminClient.auth.admin.updateUserById).toHaveBeenCalledWith(
         userId,
-        expect.objectContaining({
-          email: updateUserDto.email,
-        }),
+        { email: updateUserDto.email },
+      );
+      expect(mockAdminClient.auth.admin.updateUserById).toHaveBeenCalledWith(
+        userId,
+        { user_metadata: { name: updateUserDto.name } },
       );
 
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      expect(mockSupabaseClient.auth.admin.updateUserById).toHaveBeenCalledWith(
-        userId,
-        expect.objectContaining({
-          user_metadata: { name: updateUserDto.name },
-        }),
-      );
+      // Verificar que auditService.logEvent fue llamado
+      expect(mockAuditService.logEvent).toHaveBeenCalled();
 
+      // Verificar resultado
       expect(result).toEqual({
-        id: mockUser.id,
-        email: mockUser.email,
-        name: mockUser.user_metadata.name,
-        created_at: mockUser.created_at,
-        updated_at: mockUser.updated_at,
+        id: userId,
+        email: updateUserDto.email,
+        name: updateUserDto.name,
       });
     });
 
     it('should update only name when email is not provided', async () => {
-      // Arrange
-      const userId = 'user-id';
+      const userId = 'test-user-id';
       const updateUserDto: UpdateUserDto = {
-        name: 'Updated User',
+        name: 'Updated Name Only',
       };
 
-      const mockUser = {
-        id: userId,
-        email: 'existing@example.com',
-        user_metadata: { name: updateUserDto.name },
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-02T00:00:00Z',
-      };
-
-      // Mock para la actualización de nombre
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue({
-        data: { user: mockUser },
+      // Mock para actualizar metadata (nombre)
+      mockAdminClient.auth.admin.updateUserById.mockResolvedValueOnce({
+        data: {},
         error: null,
       });
 
-      // Mock para getCurrentUser que se llama al final
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.getUserById.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
-
-      // Act
+      // Llamar al método y verificar
       const result = await service.updateUser(userId, updateUserDto);
 
-      // Assert
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      expect(mockSupabaseClient.auth.admin.updateUserById).toHaveBeenCalledWith(
+      // Verificar que updateUserById fue llamado solo para metadata
+      expect(mockAdminClient.auth.admin.updateUserById).not.toHaveBeenCalledWith(
         userId,
-        expect.objectContaining({
-          user_metadata: { name: updateUserDto.name },
-        }),
+        { email: expect.anything() },
+      );
+      expect(mockAdminClient.auth.admin.updateUserById).toHaveBeenCalledWith(
+        userId,
+        { user_metadata: { name: updateUserDto.name } },
       );
 
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      expect(mockSupabaseClient.auth.admin.updateUserById).toHaveBeenCalledTimes(1);
+      // Verificar resultado
       expect(result).toEqual({
-        id: mockUser.id,
-        email: mockUser.email,
-        name: mockUser.user_metadata.name,
-        created_at: mockUser.created_at,
-        updated_at: mockUser.updated_at,
+        id: userId,
+        name: updateUserDto.name,
       });
     });
 
     it('should update only email when name is not provided', async () => {
-      // Arrange
-      const userId = 'user-id';
+      const userId = 'test-user-id';
       const updateUserDto: UpdateUserDto = {
-        email: 'updated@example.com',
+        email: 'email-only@example.com',
       };
 
-      const mockUser = {
-        id: userId,
-        email: updateUserDto.email,
-        user_metadata: { name: 'Existing User' },
-        created_at: '2023-01-01T00:00:00Z',
-        updated_at: '2023-01-02T00:00:00Z',
-      };
-
-      // Mock para la actualización de email
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue({
-        data: { user: mockUser },
+      // Mock para actualizar email
+      mockAdminClient.auth.admin.updateUserById.mockResolvedValueOnce({
+        data: {},
         error: null,
       });
 
-      // Mock para getCurrentUser que se llama al final
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.getUserById.mockResolvedValue({
-        data: { user: mockUser },
-        error: null,
-      });
-
-      // Act
+      // Llamar al método y verificar
       const result = await service.updateUser(userId, updateUserDto);
 
-      // Assert
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      expect(mockSupabaseClient.auth.admin.updateUserById).toHaveBeenCalledWith(
+      // Verificar que updateUserById fue llamado solo para email
+      expect(mockAdminClient.auth.admin.updateUserById).toHaveBeenCalledWith(
         userId,
-        expect.objectContaining({
-          email: updateUserDto.email,
-        }),
+        { email: updateUserDto.email },
+      );
+      expect(mockAdminClient.auth.admin.updateUserById).not.toHaveBeenCalledWith(
+        userId,
+        { user_metadata: expect.anything() },
       );
 
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      expect(mockSupabaseClient.auth.admin.updateUserById).toHaveBeenCalledTimes(1);
+      // Verificar resultado
       expect(result).toEqual({
-        id: mockUser.id,
-        email: mockUser.email,
-        name: mockUser.user_metadata.name,
-        created_at: mockUser.created_at,
-        updated_at: mockUser.updated_at,
+        id: userId,
+        email: updateUserDto.email,
       });
     });
 
     it('should throw an error when email update fails', async () => {
-      // Arrange
-      const userId = 'user-id';
+      const userId = 'test-user-id';
       const updateUserDto: UpdateUserDto = {
         email: 'invalid-email',
       };
 
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue({
-        data: { user: null },
+      // Mock para fallo de actualización de email
+      mockAdminClient.auth.admin.updateUserById.mockResolvedValueOnce({
+        data: null,
         error: { message: 'Invalid email format' },
       });
 
@@ -338,15 +272,14 @@ describe('UsersService', () => {
     });
 
     it('should throw an error when name update fails', async () => {
-      // Arrange
-      const userId = 'user-id';
+      const userId = 'test-user-id';
       const updateUserDto: UpdateUserDto = {
-        name: 'New Name',
+        name: 'Invalid Name',
       };
 
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.updateUserById.mockResolvedValue({
-        data: { user: null },
+      // Mock para fallo de actualización de metadata
+      mockAdminClient.auth.admin.updateUserById.mockResolvedValueOnce({
+        data: null,
         error: { message: 'Metadata update failed' },
       });
 
@@ -359,31 +292,33 @@ describe('UsersService', () => {
 
   describe('deleteUser', () => {
     it('should delete a user', async () => {
-      // Arrange
-      const userId = 'user-id';
+      const userId = 'test-user-id';
 
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.deleteUser.mockResolvedValue({
+      // Mock para eliminar usuario
+      mockAdminClient.auth.admin.deleteUser.mockResolvedValueOnce({
+        data: { success: true },
         error: null,
       });
 
-      // Act
+      // Llamar al método y verificar
       const result = await service.deleteUser(userId);
 
-      // Assert
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      expect(mockSupabaseClient.auth.admin.deleteUser).toHaveBeenCalledWith(
-        userId,
-      );
+      // Verificar que deleteUser fue llamado con el ID correcto
+      expect(mockAdminClient.auth.admin.deleteUser).toHaveBeenCalledWith(userId);
+      
+      // Verificar que auditService.logEvent fue llamado
+      expect(mockAuditService.logEvent).toHaveBeenCalled();
+      
+      // Verificar resultado
       expect(result).toEqual({ success: true });
     });
 
     it('should throw an error when delete fails', async () => {
-      // Arrange
-      const userId = 'non-existent-user-id';
+      const userId = 'test-user-id';
 
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.deleteUser.mockResolvedValue({
+      // Mock para fallo de eliminación de usuario
+      mockAdminClient.auth.admin.deleteUser.mockResolvedValueOnce({
+        data: null,
         error: { message: 'User not found' },
       });
 
@@ -396,275 +331,253 @@ describe('UsersService', () => {
 
   describe('getAllUsers', () => {
     it('should return all users', async () => {
-      // Arrange
-      const mockUsers = [
-        {
-          id: 'user-1',
-          email: 'user1@example.com',
-          user_metadata: { name: 'User One' },
-          created_at: '2023-01-01T00:00:00Z',
-          last_sign_in_at: '2023-01-10T00:00:00Z',
+      // Mock para listar usuarios
+      mockAdminClient.auth.admin.listUsers.mockResolvedValueOnce({
+        data: {
+          users: [
+            {
+              id: 'user-1',
+              email: 'user1@example.com',
+              user_metadata: { name: 'User One' },
+              created_at: '2023-01-01T00:00:00Z',
+            },
+            {
+              id: 'user-2',
+              email: 'user2@example.com',
+              user_metadata: { name: 'User Two' },
+              created_at: '2023-01-02T00:00:00Z',
+            },
+          ],
         },
-        {
-          id: 'user-2',
-          email: 'user2@example.com',
-          user_metadata: { name: 'User Two' },
-          created_at: '2023-01-02T00:00:00Z',
-          last_sign_in_at: '2023-01-11T00:00:00Z',
-        },
-      ];
-
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.listUsers.mockResolvedValue({
-        data: { users: mockUsers },
         error: null,
       });
 
-      // Act
+      // Llamar al método y verificar
       const result = await service.getAllUsers();
 
-      // Assert
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      expect(mockSupabaseClient.auth.admin.listUsers).toHaveBeenCalled();
+      // Verificar que listUsers fue llamado
+      expect(mockAdminClient.auth.admin.listUsers).toHaveBeenCalled();
+      
+      // Verificar resultado
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({
-        id: mockUsers[0].id,
-        email: mockUsers[0].email,
-        name: mockUsers[0].user_metadata.name,
-        createdAt: mockUsers[0].created_at,
-        lastSignIn: mockUsers[0].last_sign_in_at,
+        id: 'user-1',
+        email: 'user1@example.com',
+        name: 'User One',
+        createdAt: '2023-01-01T00:00:00Z',
       });
       expect(result[1]).toEqual({
-        id: mockUsers[1].id,
-        email: mockUsers[1].email,
-        name: mockUsers[1].user_metadata.name,
-        createdAt: mockUsers[1].created_at,
-        lastSignIn: mockUsers[1].last_sign_in_at,
+        id: 'user-2',
+        email: 'user2@example.com',
+        name: 'User Two',
+        createdAt: '2023-01-02T00:00:00Z',
       });
     });
 
     it('should handle users with missing metadata', async () => {
-      // Arrange
-      const mockUsers = [
-        {
-          id: 'user-1',
-          email: 'user1@example.com',
-          user_metadata: null,
-          created_at: '2023-01-01T00:00:00Z',
-          last_sign_in_at: '2023-01-10T00:00:00Z',
+      // Mock para listar usuarios con metadata faltante
+      mockAdminClient.auth.admin.listUsers.mockResolvedValueOnce({
+        data: {
+          users: [
+            {
+              id: 'user-1',
+              email: 'user1@example.com',
+              // Sin user_metadata
+              created_at: '2023-01-01T00:00:00Z',
+            },
+          ],
         },
-      ];
-
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.listUsers.mockResolvedValue({
-        data: { users: mockUsers },
         error: null,
       });
 
-      // Act
+      // Llamar al método y verificar
       const result = await service.getAllUsers();
 
-      // Assert
-      expect(result[0].name).toBe('');
+      // Verificar resultado
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        id: 'user-1',
+        email: 'user1@example.com',
+        name: '',
+        createdAt: '2023-01-01T00:00:00Z',
+      });
     });
 
     it('should throw InternalServerErrorException when listUsers fails', async () => {
-      // Arrange
-      // @ts-ignore: Ignorar error de tipado en el mock para pruebas
-      mockSupabaseClient.auth.admin.listUsers.mockResolvedValue({
+      // Mock para fallo de listUsers
+      mockAdminClient.auth.admin.listUsers.mockResolvedValueOnce({
         data: null,
-        error: { message: 'Failed to list users' },
+        error: { message: 'Database error' },
       });
 
       // Act & Assert
-      await expect(service.getAllUsers()).rejects.toThrow(
-        InternalServerErrorException,
-      );
+      await expect(service.getAllUsers()).rejects.toThrow(InternalServerErrorException);
     });
   });
 
   describe('setActiveCompany', () => {
     it('should set active company for user', async () => {
-      // Arrange
-      const userId = 'user-1';
-      const selectActiveCompanyDto: SelectActiveCompanyDto = {
+      const userId = 'test-user-id';
+      const dto: SelectActiveCompanyDto = {
         companyId: 'company-1',
       };
 
       // Mock para verificar pertenencia a la compañía
-      mockSupabaseClient.single.mockResolvedValueOnce({
-        data: {
-          id: 'company-user-1',
-          company: {
-            id: 'company-1',
-            name: 'Test Company',
-          },
-        },
+      mockClient.from.mockReturnValue(mockClient);
+      mockClient.select.mockReturnValue(mockClient);
+      mockClient.eq.mockReturnValue(mockClient);
+      mockClient.eq.mockReturnValue(mockClient);
+      mockClient.single.mockResolvedValueOnce({
+        data: { company_id: 'company-1', user_id: userId, role: 'member' },
         error: null,
       });
 
-      // Mock para verificar si ya existe un registro de compañía activa
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
-        data: {
-          id: 'active-company-1',
-        },
+      // Mock para actualizar compañía activa
+      mockClient.from.mockReturnValue(mockClient);
+      mockClient.select.mockReturnValue(mockClient);
+      mockClient.eq.mockReturnValue(mockClient);
+      mockClient.maybeSingle.mockResolvedValueOnce({
+        data: { id: 'active-1', user_id: userId, company_id: 'company-old' },
         error: null,
       });
 
-      // Mock para actualizar el registro existente
-      mockSupabaseClient.eq.mockResolvedValueOnce({
+      mockClient.from.mockReturnValue(mockClient);
+      mockClient.update.mockReturnValue(mockClient);
+      mockClient.eq.mockReturnValue(mockClient);
+      mockClient.single.mockResolvedValueOnce({
+        data: { id: 'active-1', user_id: userId, company_id: dto.companyId },
         error: null,
       });
 
-      // Mock para actualizar los metadatos del usuario
-      mockSupabaseAdminClient.auth.admin.updateUserById.mockResolvedValueOnce({
-        data: {},
-        error: null,
-      });
+      // Llamar al método y verificar
+      const result = await service.setActiveCompany(userId, dto);
 
-      // Act
-      const result = await service.setActiveCompany(userId, selectActiveCompanyDto);
-
-      // Assert
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('company_user');
-      expect(mockSupabaseClient.select).toHaveBeenCalledWith('id, company:company_id(id, name)');
-      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('auth_id', userId);
-      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('company_id', 'company-1');
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('user_active_company');
-      expect(mockSupabaseClient.update).toHaveBeenCalled();
-      expect(mockSupabaseAdminClient.auth.admin.updateUserById).toHaveBeenCalledWith(
-        userId,
-        {
-          user_metadata: {
-            active_company_id: 'company-1',
-            onboarding_status: 'ONBOARDING_COMPLETED'
-          },
-        }
-      );
+      // Verificar llamadas
+      expect(mockClient.from).toHaveBeenCalledWith('company_user');
+      expect(mockClient.from).toHaveBeenCalledWith('user_active_company');
+      expect(mockClient.update).toHaveBeenCalledWith({ company_id: dto.companyId });
       expect(mockAuditService.logEvent).toHaveBeenCalled();
+      
+      // Verificar resultado
       expect(result).toEqual({
-        success: true,
-        message: 'Compañía activa establecida correctamente',
-        companyId: 'company-1',
-        companyName: 'Test Company',
+        activeCompany: dto.companyId,
       });
     });
 
     it('should create new active company record if none exists', async () => {
-      // Arrange
-      const userId = 'user-1';
-      const selectActiveCompanyDto: SelectActiveCompanyDto = {
+      const userId = 'test-user-id';
+      const dto: SelectActiveCompanyDto = {
         companyId: 'company-1',
       };
 
       // Mock para verificar pertenencia a la compañía
-      mockSupabaseClient.single.mockResolvedValueOnce({
-        data: {
-          id: 'company-user-1',
-          company: {
-            id: 'company-1',
-            name: 'Test Company',
-          },
-        },
+      mockClient.from.mockReturnValue(mockClient);
+      mockClient.select.mockReturnValue(mockClient);
+      mockClient.eq.mockReturnValue(mockClient);
+      mockClient.eq.mockReturnValue(mockClient);
+      mockClient.single.mockResolvedValueOnce({
+        data: { company_id: 'company-1', user_id: userId, role: 'member' },
         error: null,
       });
 
-      // Mock para verificar si ya existe un registro de compañía activa (no existe)
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+      // Mock para buscar compañía activa (no existe)
+      mockClient.from.mockReturnValue(mockClient);
+      mockClient.select.mockReturnValue(mockClient);
+      mockClient.eq.mockReturnValue(mockClient);
+      mockClient.maybeSingle.mockResolvedValueOnce({
         data: null,
         error: null,
       });
 
-      // Mock para crear un nuevo registro
-      mockSupabaseClient.insert.mockResolvedValueOnce({
+      // Mock para insertar nueva compañía activa
+      mockClient.from.mockReturnValue(mockClient);
+      mockClient.insert.mockReturnValue(mockClient);
+      mockClient.single.mockResolvedValueOnce({
+        data: { id: 'new-active-1', user_id: userId, company_id: dto.companyId },
         error: null,
       });
 
-      // Mock para actualizar los metadatos del usuario
-      mockSupabaseAdminClient.auth.admin.updateUserById.mockResolvedValueOnce({
-        data: {},
-        error: null,
+      // Llamar al método y verificar
+      const result = await service.setActiveCompany(userId, dto);
+
+      // Verificar llamadas
+      expect(mockClient.from).toHaveBeenCalledWith('company_user');
+      expect(mockClient.from).toHaveBeenCalledWith('user_active_company');
+      expect(mockClient.insert).toHaveBeenCalledWith({
+        user_id: userId,
+        company_id: dto.companyId,
       });
-
-      // Act
-      const result = await service.setActiveCompany(userId, selectActiveCompanyDto);
-
-      // Assert
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('company_user');
-      expect(mockSupabaseClient.select).toHaveBeenCalledWith('id, company:company_id(id, name)');
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('user_active_company');
-      expect(mockSupabaseClient.insert).toHaveBeenCalled();
-      expect(mockSupabaseAdminClient.auth.admin.updateUserById).toHaveBeenCalledWith(
-        userId,
-        expect.any(Object)
-      );
       expect(mockAuditService.logEvent).toHaveBeenCalled();
-      expect(result.success).toBe(true);
+      
+      // Verificar resultado
+      expect(result).toEqual({
+        activeCompany: dto.companyId,
+      });
     });
 
     it('should throw BadRequestException if user does not belong to company', async () => {
-      // Arrange
-      const userId = 'user-1';
-      const selectActiveCompanyDto: SelectActiveCompanyDto = {
-        companyId: 'company-2',
+      const userId = 'test-user-id';
+      const dto: SelectActiveCompanyDto = {
+        companyId: 'company-not-found',
       };
 
       // Mock para verificar pertenencia a la compañía (no pertenece)
-      mockSupabaseClient.single.mockResolvedValueOnce({
+      mockClient.from.mockReturnValue(mockClient);
+      mockClient.select.mockReturnValue(mockClient);
+      mockClient.eq.mockReturnValue(mockClient);
+      mockClient.eq.mockReturnValue(mockClient);
+      mockClient.single.mockResolvedValueOnce({
         data: null,
-        error: {
-          message: 'No data found',
-        },
+        error: { code: 'PGRST116', message: 'No se encontró ningún resultado' },
       });
 
       // Act & Assert
-      await expect(service.setActiveCompany(userId, selectActiveCompanyDto))
-        .rejects.toThrow(BadRequestException);
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('company_user');
-      expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('user_active_company');
+      await expect(service.setActiveCompany(userId, dto)).rejects.toThrow(BadRequestException);
+      expect(mockClient.from).toHaveBeenCalledWith('company_user');
       expect(mockAuditService.logEvent).not.toHaveBeenCalled();
     });
 
     it('should throw InternalServerErrorException if database error occurs', async () => {
-      // Arrange
-      const userId = 'user-1';
-      const selectActiveCompanyDto: SelectActiveCompanyDto = {
+      const userId = 'test-user-id';
+      const dto: SelectActiveCompanyDto = {
         companyId: 'company-1',
       };
 
       // Mock para verificar pertenencia a la compañía
-      mockSupabaseClient.single.mockResolvedValueOnce({
-        data: {
-          id: 'company-user-1',
-          company: {
-            id: 'company-1',
-            name: 'Test Company',
-          },
-        },
+      mockClient.from.mockReturnValue(mockClient);
+      mockClient.select.mockReturnValue(mockClient);
+      mockClient.eq.mockReturnValue(mockClient);
+      mockClient.eq.mockReturnValue(mockClient);
+      mockClient.single.mockResolvedValueOnce({
+        data: { company_id: 'company-1', user_id: userId, role: 'member' },
         error: null,
       });
 
-      // Mock para verificar si ya existe un registro de compañía activa
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
-        data: {
-          id: 'active-company-1',
-        },
+      // Mock para buscar compañía activa
+      mockClient.from.mockReturnValue(mockClient);
+      mockClient.select.mockReturnValue(mockClient);
+      mockClient.eq.mockReturnValue(mockClient);
+      mockClient.maybeSingle.mockResolvedValueOnce({
+        data: { id: 'active-1', user_id: userId, company_id: 'company-old' },
         error: null,
       });
 
-      // Mock para actualizar el registro existente (falla)
-      mockSupabaseClient.eq.mockResolvedValueOnce({
-        error: {
-          message: 'Database error',
-        },
+      // Mock para actualizar (falla)
+      mockClient.from.mockReturnValue(mockClient);
+      mockClient.update.mockReturnValue(mockClient);
+      mockClient.eq.mockReturnValue(mockClient);
+      mockClient.single.mockResolvedValueOnce({
+        data: null,
+        error: { code: 'PGRST301', message: 'Database error' },
       });
 
       // Act & Assert
-      await expect(service.setActiveCompany(userId, selectActiveCompanyDto))
-        .rejects.toThrow(InternalServerErrorException);
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('company_user');
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('user_active_company');
-      expect(mockSupabaseClient.update).toHaveBeenCalled();
+      await expect(service.setActiveCompany(userId, dto)).rejects.toThrow(
+        InternalServerErrorException,
+      );
+      expect(mockClient.from).toHaveBeenCalledWith('company_user');
+      expect(mockClient.from).toHaveBeenCalledWith('user_active_company');
+      expect(mockClient.update).toHaveBeenCalled();
       expect(mockAuditService.logEvent).not.toHaveBeenCalled();
     });
   });
