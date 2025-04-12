@@ -159,6 +159,10 @@ Este documento detalla el estado actual de implementación del Backend for Front
 - ✅ `common/mocks/supabase.mock.ts` - Mocks mejorados para soportar admin y verifyOtp.
 
 ### Pruebas con Problemas
+- ⚠️ `reports/reports.service.spec.ts` - Múltiples errores de tipado en propiedades como `limit`, `consents`, `totalPolicies`, etc. que no existen en los DTOs.
+- ⚠️ `data-subjects/data-subjects.controller.spec.ts` - Problemas con `RequestWithCompanyContext` y errores de tipado en los DTOs.
+- ⚠️ `companies/companies.controller.spec.ts` - Métodos no existentes en el servicio como `updateStatus`, `getSubscriptionHistory` y `remove`.
+- ⚠️ `auth/auth.service.spec.ts` - Problemas con la definición de tipos para los mocks, especialmente con `_isMockFunction` y `_protoImpl` que faltan en los mocks.
 - ⚠️ `users/users.controller.spec.ts` - 7 pruebas fallando, 8 pasando. Problemas con parámetros en métodos.
 - ⚠️ `users/users.service.spec.ts` - 11 pruebas fallando, 6 pasando. Progreso en la corrección de mocks.
 - ⚠️ `data-types/data-types.service.spec.ts` - Errores con JWT y Supabase.
