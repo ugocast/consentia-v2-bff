@@ -64,6 +64,20 @@ export const companyUser = pgTable("company_user", {
   metadata: json("metadata")
 });
 
+// Invitation - Nueva tabla para gestionar invitaciones a usuarios
+export const invitation = pgTable("invitation", {
+  invitation_id: uuid("invitation_id").defaultRandom().primaryKey(),
+  company_id: uuid("company_id").references(() => company.company_id, { onDelete: "cascade" }).notNull(),
+  email: text("email").notNull(),
+  role: text("role", { enum: ["ADMINISTRATOR", "OPERATOR", "AUDITOR"] }).default("OPERATOR").notNull(),
+  token: text("token").notNull().unique(),
+  invited_by: uuid("invited_by").references(() => companyUser.company_user_id, { onDelete: "set null" }),
+  invited_at: timestamp("invited_at").defaultNow().notNull(),
+  expires_at: timestamp("expires_at").notNull(),
+  status: text("status", { enum: ["PENDING", "ACCEPTED", "EXPIRED", "CANCELED"] }).default("PENDING").notNull(),
+  metadata: json("metadata")
+});
+
 // UserActiveCompany - Nueva tabla para almacenar la empresa activa de un usuario
 export const userActiveCompany = pgTable("user_active_company", {
   active_company_id: uuid("active_company_id").defaultRandom().primaryKey(),

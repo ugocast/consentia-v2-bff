@@ -16,6 +16,7 @@ import { ExternalIntegrationsModule } from './external-integrations/external-int
 import { CompanyUsersModule } from './company-users/company-users.module';
 import { ConsentDataTypesModule } from './consent-data-types/consent-data-types.module';
 import { DataSubjectsModule } from './data-subjects/data-subjects.module';
+import { InvitationsModule } from './invitations/invitations.module';
 import { CompanyContextMiddleware } from './common/middleware/company-context.middleware';
 import { CompanyFilterInterceptor } from './common/interceptors/company-filter.interceptor';
 import { AuthAuditMiddleware } from './common/security/middleware/auth-audit.middleware';
@@ -40,6 +41,7 @@ import { SecurityModule } from './common/security/security.module';
     CompanyUsersModule,
     ConsentDataTypesModule,
     DataSubjectsModule,
+    InvitationsModule,
   ],
   controllers: [AppController],
   providers: [
@@ -52,14 +54,16 @@ import { SecurityModule } from './common/security/security.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Aplicar middleware de contexto de empresa a todas las rutas excepto autenticación
+    // Aplicar middleware de contexto de empresa a todas las rutas excepto autenticación e invitaciones públicas
     consumer
       .apply(CompanyContextMiddleware)
       .exclude(
         { path: 'auth/login', method: RequestMethod.POST },
         { path: 'auth/register', method: RequestMethod.POST },
         { path: 'auth/reset-password', method: RequestMethod.POST },
-        { path: 'auth/logout', method: RequestMethod.POST }
+        { path: 'auth/logout', method: RequestMethod.POST },
+        { path: 'invitations/accept', method: RequestMethod.POST },
+        { path: 'invitations/verify/:token', method: RequestMethod.GET }
       )
       .forRoutes('*');
       

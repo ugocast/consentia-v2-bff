@@ -1,12 +1,23 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import {
   LoginDto,
   RegisterDto,
   ResetPasswordDto,
   UpdatePasswordDto,
+  VerifyEmailDto,
 } from './dto/auth.dto';
+import {
+  LoginResponseDto,
+  RegisterResponseDto,
+  ResetPasswordResponseDto,
+  UpdatePasswordResponseDto,
+  VerifyEmailResponseDto,
+  OnboardingStatusResponseDto,
+} from './dto/standard-response.dto';
 
 // Mock del servicio de autenticación
 const mockAuthService = {
@@ -17,6 +28,8 @@ const mockAuthService = {
   updatePassword: jest.fn(),
   verifyToken: jest.fn(),
   refreshToken: jest.fn(),
+  verifyEmail: jest.fn(),
+  getOnboardingStatus: jest.fn(),
 };
 
 describe('AuthController', () => {
@@ -228,6 +241,53 @@ describe('AuthController', () => {
         refreshTokenDto.refresh_token,
       );
       expect(result).toEqual(mockResult);
+    });
+  });
+
+  describe('verifyEmail', () => {
+    it('should verify email with valid token', async () => {
+      const verifyEmailDto: VerifyEmailDto = {
+        token: 'valid-token',
+      };
+      
+      const expectedResponse: VerifyEmailResponseDto = {
+        success: true,
+        message: 'Email successfully verified',
+        userId: 'user-123',
+      };
+      
+      mockAuthService.verifyEmail.mockResolvedValue(expectedResponse);
+      
+      const result = await controller.verifyEmail(verifyEmailDto);
+      
+      expect(result).toEqual(expectedResponse);
+      expect(mockAuthService.verifyEmail).toHaveBeenCalledWith(verifyEmailDto);
+    });
+  });
+
+  describe('getOnboardingStatus', () => {
+    it('should return onboarding status for a user', async () => {
+      const userId = 'user-123';
+      
+      const expectedResponse: OnboardingStatusResponseDto = {
+        hasVerifiedEmail: true,
+        hasCompany: true,
+        companies: [
+          { 
+            id: 'company-123', 
+            name: 'Test Company', 
+            role: 'ADMIN' 
+          }
+        ],
+      };
+      
+      mockAuthService.getOnboardingStatus.mockResolvedValue(expectedResponse);
+      
+      // Simulate the CurrentUser decorator by directly passing userId as the user
+      const result = await controller.getOnboardingStatus({ id: userId });
+      
+      expect(result).toEqual(expectedResponse);
+      expect(mockAuthService.getOnboardingStatus).toHaveBeenCalledWith(userId);
     });
   });
 });

@@ -12,11 +12,15 @@ import { CompanyContextService } from './services/company-context.service';
 import { CompanyContextController } from './controllers/company-context.controller';
 import { CompanyContextGuard } from './guards/company-context.guard';
 import { ApiKeysModule } from './api-keys/api-keys.module';
+import { EmailModule } from './services/email/email.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     AuditModule,
     forwardRef(() => ApiKeysModule),
+    forwardRef(() => AuthModule),
+    EmailModule,
   ],
   controllers: [
     CompanyContextController,
@@ -46,6 +50,8 @@ import { ApiKeysModule } from './api-keys/api-keys.module';
     CompanyContextService,
     CompanyContextGuard,
     forwardRef(() => ApiKeysModule),
+    forwardRef(() => AuthModule),
+    EmailModule,
   ],
 })
 export class CommonModule {}

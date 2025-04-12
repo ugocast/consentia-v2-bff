@@ -8,7 +8,7 @@ export const appConfig = {
 
   // Configuración del servidor
   server: {
-    port: process.env.PORT || 3000,
+    port: process.env.PORT || 3001,
     frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3001',
     apiPrefix: 'api/v1',
     docsPath: 'api/docs',

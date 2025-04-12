@@ -1,5 +1,6 @@
-import { Injectable, Logger, UnauthorizedException, InternalServerErrorException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException, InternalServerErrorException, ConflictException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { createSupabaseClient } from '../config/supabase.config';
+import { JwtService } from '@nestjs/jwt';
 import {
   LoginDto,
   RegisterDto,
@@ -11,24 +12,42 @@ import {
   ResetPasswordResponseDto,
   UpdatePasswordResponseDto,
   RefreshTokenResponseDto,
-  VerifyTokenResponseDto
+  VerifyEmailDto,
+  VerifyEmailResponseDto,
+  OnboardingStatusResponseDto
 } from './dto';
+import { VerifyTokenResponseDto } from './dto/standard-response.dto';
 import { ErrorCode } from '../common/interfaces/error-types.interface';
 import { AuditService } from '../common/audit/audit.service';
 import { AuditAction, ResourceType } from '../common/audit/audit.types';
+import { UsersService } from '../users/users.service';
+import { EmailService } from '../common/services/email/email.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private supabase = createSupabaseClient();
+  private frontendUrl: string;
 
-  constructor(private readonly auditService: AuditService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly auditService: AuditService,
+    
+    @Inject(forwardRef(() => UsersService))
+    private readonly usersService: UsersService,
+
+    private readonly emailService: EmailService,
+    private readonly configService: ConfigService,
+  ) {
+    this.frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'https://app.consentia.io';
+  }
 
   /**
    * Registra un nuevo usuario
    */
   async register(registerDto: RegisterDto): Promise<RegisterResponseDto> {
-    const { email, password, name, companyId } = registerDto;
+    const { email, password, name } = registerDto;
     
     try {
       // Registrar usuario en Supabase Auth
@@ -39,8 +58,7 @@ export class AuthService {
           options: {
             data: {
               name,
-              // Si se proporciona un ID de compañía, lo guardamos en los metadatos
-              ...(companyId && { companyId }),
+              onboarding_status: 'REGISTERED'
             },
           },
         });
@@ -65,50 +83,9 @@ export class AuthService {
         });
       }
 
-      // Si se proporciona un ID de compañía, asignamos el usuario a la compañía
-      if (companyId && authData.user) {
-        try {
-          // Verificar si hay otros usuarios en la compañía
-          const { data: existingUsers, error: countError } = await this.supabase
-            .from('company_user')
-            .select('*', { count: 'exact', head: true })
-            .eq('company_id', companyId);
-          
-          // Determinar el rol inicial (primer usuario = ADMIN, otros = USER)
-          const initialRole = (!existingUsers || existingUsers.length === 0) 
-            ? 'ADMIN' 
-            : 'USER';
-
-          // Crear registro en company_user
-          const { error: companyUserError } = await this.supabase
-            .from('company_user')
-            .insert({
-              company_id: companyId,
-              auth_id: authData.user.id,
-              email: email,
-              full_name: name,
-              role: initialRole,
-              status: 'ACTIVE',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            });
-
-          if (companyUserError) {
-            this.logger.error(`Error al asignar usuario a compañía: ${companyUserError.message}`, {
-              userId: authData.user.id,
-              companyId,
-              error: companyUserError,
-            });
-            // No fallamos el registro por esto, pero lo registramos
-          }
-        } catch (companyError) {
-          this.logger.error(`Error al procesar asignación de compañía: ${companyError.message}`, {
-            userId: authData.user?.id,
-            companyId,
-            error: companyError,
-          });
-          // No fallamos el registro por esto, pero lo registramos
-        }
+      // Enviar email de verificación
+      if (authData.user) {
+        await this.sendVerificationEmail(authData.user.id, email, name);
       }
 
       // Registrar evento de auditoría
@@ -119,8 +96,7 @@ export class AuthService {
         userId: authData.user?.id || 'system',
         metadata: { 
           email,
-          success: true,
-          companyId: companyId || undefined,
+          success: true
         },
       });
 
@@ -130,7 +106,6 @@ export class AuthService {
           email: authData.user?.email || '',
           user_metadata: {
             name: authData.user?.user_metadata?.name || '',
-            companyId: companyId || undefined,
           },
           created_at: authData.user?.created_at || '',
         },
@@ -170,6 +145,127 @@ export class AuthService {
       throw new InternalServerErrorException({
         code: ErrorCode.UNKNOWN_ERROR,
         message: 'Error inesperado al registrar usuario',
+        metadata: { originalError: error.message },
+      });
+    }
+  }
+
+  /**
+   * Envía un email de verificación al usuario
+   * @param userId ID del usuario
+   * @param email Email del usuario
+   * @param name Nombre del usuario
+   */
+  private async sendVerificationEmail(userId: string, email: string, name: string): Promise<void> {
+    try {
+      // Generar OTP para verificación de email
+      const { data, error } = await this.supabase.auth.admin.generateLink({
+        type: 'email_change_new',
+        email: email,
+        newEmail: email, // Es el mismo email, solo para generar el OTP
+        options: {
+          redirectTo: `${this.frontendUrl}/auth/verify-email`
+        }
+      });
+
+      if (error || !data.properties?.email_otp) {
+        this.logger.error(`Error al generar token de verificación: ${error?.message}`, {
+          userId,
+          email,
+          error,
+        });
+        return;
+      }
+
+      const verificationToken = data.properties.email_otp;
+      const verificationLink = `${this.frontendUrl}/auth/verify-email?token=${verificationToken}`;
+      
+      // Enviar email usando el servicio de email
+      const result = await this.emailService.sendVerificationEmail({
+        email,
+        name,
+        verificationLink,
+        expirationHours: 24
+      });
+
+      if (!result.success) {
+        this.logger.error(`Error al enviar email de verificación: ${result.error?.message}`, {
+          userId,
+          email,
+          error: result.error,
+        });
+      } else {
+        this.logger.log(`Email de verificación enviado a ${email} con ID: ${result.data?.id}`);
+      }
+    } catch (error) {
+      this.logger.error(`Error al enviar email de verificación: ${error.message}`, {
+        userId,
+        email,
+        error,
+      });
+    }
+  }
+
+  /**
+   * Reenvía el email de verificación
+   * @param userId ID del usuario
+   */
+  async resendVerificationEmail(userId: string): Promise<{ success: boolean, message: string }> {
+    try {
+      // Obtener datos del usuario
+      const { data: userData, error: userError } = await this.supabase.auth.admin
+        .getUserById(userId);
+
+      if (userError || !userData.user) {
+        this.logger.error(`Error al obtener usuario: ${userError?.message || 'Usuario no encontrado'}`, {
+          userId,
+          error: userError,
+        });
+        
+        throw new BadRequestException({
+          code: ErrorCode.USER_NOT_FOUND,
+          message: 'Usuario no encontrado',
+          metadata: userError ? { originalError: userError.message } : undefined,
+        });
+      }
+
+      // Verificar si el email ya está verificado
+      const isEmailVerified = 
+        userData.user.email_confirmed_at !== null || 
+        userData.user.user_metadata?.email_verified === true;
+
+      if (isEmailVerified) {
+        return {
+          success: true,
+          message: 'El email ya está verificado'
+        };
+      }
+
+      // Enviar email de verificación
+      const email = userData.user.email || '';
+      const name = userData.user.user_metadata?.name || 'Usuario';
+      
+      await this.sendVerificationEmail(userId, email, name);
+
+      return {
+        success: true,
+        message: 'Email de verificación enviado'
+      };
+    } catch (error) {
+      // Si el error ya es una excepción de NestJS, la relanzamos
+      if (error instanceof BadRequestException || 
+          error instanceof InternalServerErrorException) {
+        throw error;
+      }
+      
+      this.logger.error(`Error inesperado al reenviar email de verificación: ${error.message}`, {
+        userId,
+        error,
+      });
+      
+      throw new InternalServerErrorException({
+        code: ErrorCode.UNKNOWN_ERROR,
+        message: 'Error inesperado al reenviar email de verificación',
         metadata: { originalError: error.message },
       });
     }
@@ -549,6 +645,164 @@ export class AuthService {
       throw new UnauthorizedException({
         code: ErrorCode.INVALID_TOKEN,
         message: 'Error al refrescar token',
+        metadata: { originalError: error.message },
+      });
+    }
+  }
+
+  /**
+   * Verifica el email de un usuario utilizando el token de verificación
+   * @param verifyEmailDto DTO con el token de verificación
+   * @returns Resultado de la verificación
+   */
+  async verifyEmail(verifyEmailDto: VerifyEmailDto): Promise<VerifyEmailResponseDto> {
+    const { token } = verifyEmailDto;
+    
+    try {
+      // Verificar la validez del token de verificación
+      const { data, error } = await this.supabase.auth.verifyOtp({
+        token,
+        type: 'email',
+        email: '' // El email se extrae del token, pero el API requiere este campo
+      });
+
+      if (error) {
+        this.logger.error(`Error al verificar email: ${error.message}`, {
+          token,
+          error: error,
+        });
+        
+        throw new BadRequestException({
+          code: ErrorCode.INVALID_TOKEN,
+          message: 'Token de verificación inválido o expirado',
+          metadata: { originalError: error.message },
+        });
+      }
+
+      if (!data.user) {
+        throw new BadRequestException({
+          code: ErrorCode.USER_NOT_FOUND,
+          message: 'No se encontró el usuario asociado a este token',
+        });
+      }
+
+      // Actualizar el estado de verificación en los metadatos del usuario
+      const { error: updateError } = await this.supabase.auth.updateUser({
+        data: {
+          email_verified: true,
+          onboarding_status: 'EMAIL_VERIFIED'
+        }
+      });
+
+      if (updateError) {
+        this.logger.error(`Error al actualizar estado de verificación: ${updateError.message}`, {
+          userId: data.user.id,
+          error: updateError,
+        });
+        
+        // No fallamos la operación, pero lo registramos
+      }
+
+      // Registrar evento de auditoría
+      await this.auditService.logEvent({
+        action: AuditAction.EMAIL_VERIFIED,
+        resourceType: ResourceType.USER,
+        resourceId: data.user.id,
+        userId: data.user.id,
+        metadata: { 
+          email: data.user.email,
+          success: true,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Email verificado correctamente',
+        userId: data.user.id,
+      };
+    } catch (error) {
+      // Si el error ya es una excepción de NestJS, la relanzamos
+      if (error instanceof BadRequestException || 
+          error instanceof InternalServerErrorException) {
+        throw error;
+      }
+      
+      this.logger.error(`Error inesperado al verificar email: ${error.message}`, {
+        token,
+        error,
+      });
+      
+      throw new InternalServerErrorException({
+        code: ErrorCode.UNKNOWN_ERROR,
+        message: 'Error inesperado al verificar email',
+        metadata: { originalError: error.message },
+      });
+    }
+  }
+
+  /**
+   * Obtiene el estado de onboarding de un usuario
+   * @param userId ID del usuario
+   * @returns Estado de onboarding
+   */
+  async getOnboardingStatus(userId: string): Promise<OnboardingStatusResponseDto> {
+    try {
+      // Obtener datos del usuario desde Supabase Auth
+      const { data: userData, error: userError } = await this.supabase.auth.admin
+        .getUserById(userId);
+
+      if (userError || !userData.user) {
+        this.logger.error(`Error al obtener usuario: ${userError?.message || 'Usuario no encontrado'}`, {
+          userId,
+          error: userError,
+        });
+        
+        throw new BadRequestException({
+          code: ErrorCode.USER_NOT_FOUND,
+          message: 'Usuario no encontrado',
+          metadata: userError ? { originalError: userError.message } : undefined,
+        });
+      }
+
+      // Verificar si el email está verificado
+      const hasVerifiedEmail = 
+        userData.user.email_confirmed_at !== null || 
+        userData.user.user_metadata?.email_verified === true;
+
+      // Consulta separada para contar compañías
+      const { count, error: countError } = await this.supabase
+        .from('company_user')
+        .select('*', { count: 'exact', head: true })
+        .eq('auth_id', userId);
+
+      if (countError) {
+        this.logger.error(`Error al contar compañías del usuario: ${countError.message}`, {
+          userId,
+          error: countError,
+        });
+      }
+
+      // Respuesta simplificada
+      return {
+        hasVerifiedEmail,
+        hasCompany: count ? count > 0 : false,
+        companies: [], // Simplificamos para la fase 1, se añadirán detalles en la fase 3
+      };
+    } catch (error) {
+      // Si el error ya es una excepción de NestJS, la relanzamos
+      if (error instanceof BadRequestException || 
+          error instanceof InternalServerErrorException) {
+        throw error;
+      }
+      
+      this.logger.error(`Error inesperado al obtener estado de onboarding: ${error.message}`, {
+        userId,
+        error,
+      });
+      
+      throw new InternalServerErrorException({
+        code: ErrorCode.UNKNOWN_ERROR,
+        message: 'Error inesperado al obtener estado de onboarding',
         metadata: { originalError: error.message },
       });
     }

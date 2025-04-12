@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UnauthorizedException, ConflictException, InternalServerErrorException } from '@nestjs/common';
+import { UnauthorizedException, ConflictException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { mockSupabaseClient, resetSupabaseMocks } from '../common/mocks/supabase.mock';
 import {
@@ -11,10 +11,25 @@ import {
 import * as supabaseConfig from '../config/supabase.config';
 import { AuditService } from '../common/audit/audit.service';
 import { ErrorCode } from '../common/interfaces/error-types.interface';
+import { EmailService } from '../common/services/email/email.service';
+import { ConfigService } from '@nestjs/config';
 
 // Mock del servicio de auditoría
 const mockAuditService = {
   logEvent: jest.fn().mockResolvedValue(undefined),
+};
+
+// Mock del servicio de email
+const mockEmailService = {
+  sendVerificationEmail: jest.fn(),
+};
+
+// Mock del servicio de configuración
+const mockConfigService = {
+  get: jest.fn().mockImplementation((key) => {
+    if (key === 'FRONTEND_URL') return 'http://localhost:3001';
+    return null;
+  }),
 };
 
 // Extender el mockSupabaseClient para incluir auth
@@ -27,6 +42,11 @@ mockSupabaseClient.auth = {
   resetPasswordForEmail: jest.fn(),
   updateUser: jest.fn(),
   refreshSession: jest.fn(),
+  verifyOtp: jest.fn(),
+  admin: {
+    getUserById: jest.fn(),
+    generateLink: jest.fn(),
+  },
 };
 
 // Mock del módulo de configuración de Supabase
@@ -49,7 +69,9 @@ describe('AuthService', () => {
 
     // Resetear los mocks de auth
     Object.keys(mockSupabaseClient.auth).forEach(key => {
-      mockSupabaseClient.auth[key].mockReset();
+      if (typeof mockSupabaseClient.auth[key].mockReset === 'function') {
+        mockSupabaseClient.auth[key].mockReset();
+      }
     });
 
     // Configurar el mock para devolver el cliente de Supabase
@@ -61,6 +83,8 @@ describe('AuthService', () => {
       providers: [
         AuthService,
         { provide: AuditService, useValue: mockAuditService },
+        { provide: EmailService, useValue: mockEmailService },
+        { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
 
@@ -90,7 +114,7 @@ describe('AuthService', () => {
       const mockUser = {
         id: 'user-id',
         email: registerDto.email,
-        user_metadata: { name: registerDto.name },
+        user_metadata: { name: registerDto.name, onboarding_status: 'REGISTERED' },
         created_at: new Date().toISOString(),
       };
 
@@ -118,6 +142,7 @@ describe('AuthService', () => {
         options: {
           data: {
             name: registerDto.name,
+            onboarding_status: 'REGISTERED'
           },
         },
       });
@@ -138,21 +163,20 @@ describe('AuthService', () => {
       });
     });
 
-    it('should register a user with company assignment', async () => {
+    it('should register a new user and send verification email', async () => {
       // Arrange
       const registerDto: RegisterDto = {
-        email: 'test@example.com',
+        email: 'new@example.com',
         password: 'Password123!',
-        name: 'Test User',
-        companyId: 'company-id',
+        name: 'New User',
       };
 
       const mockUser = {
-        id: 'user-id',
+        id: 'user-1',
         email: registerDto.email,
-        user_metadata: { 
+        user_metadata: {
           name: registerDto.name,
-          companyId: registerDto.companyId,
+          onboarding_status: 'REGISTERED'
         },
         created_at: new Date().toISOString(),
       };
@@ -160,31 +184,31 @@ describe('AuthService', () => {
       const mockSession = {
         access_token: 'access-token',
         refresh_token: 'refresh-token',
-        expires_at: new Date().getTime() / 1000 + 3600,
+        expires_at: 3600,
       };
 
-      mockSupabaseClient.auth.signUp.mockResolvedValue({
+      mockSupabaseClient.auth.signUp.mockResolvedValueOnce({
         data: {
           user: mockUser,
           session: mockSession,
         },
         error: null,
       });
-
-      // Simular consulta para comprobar si hay usuarios en la compañía
-      mockSupabaseClient.from.mockReturnThis();
-      mockSupabaseClient.select.mockReturnThis();
-      mockSupabaseClient.eq.mockReturnThis();
-      mockSupabaseClient.execute.mockResolvedValueOnce({
-        data: [],
+      
+      // Mock para generateLink para crear token de verificación
+      mockSupabaseClient.auth.admin.generateLink.mockResolvedValueOnce({
+        data: {
+          properties: {
+            email_otp: 'verification-token-123'
+          }
+        },
         error: null
       });
 
-      // Simular inserción del usuario en la compañía
-      mockSupabaseClient.insert.mockReturnThis();
-      mockSupabaseClient.execute.mockResolvedValueOnce({
-        data: { id: 'company-user-id' },
-        error: null
+      // Mock para sendVerificationEmail
+      mockEmailService.sendVerificationEmail.mockResolvedValueOnce({
+        success: true,
+        data: { id: 'email-123' }
       });
 
       // Act
@@ -197,14 +221,37 @@ describe('AuthService', () => {
         options: {
           data: {
             name: registerDto.name,
-            companyId: registerDto.companyId,
+            onboarding_status: 'REGISTERED'
           },
         },
       });
+      
+      // Verificar que se generó el token
+      expect(mockSupabaseClient.auth.admin.generateLink).toHaveBeenCalled();
+      
+      // Verificar que se envió el email con los parámetros correctos
+      expect(mockEmailService.sendVerificationEmail).toHaveBeenCalledWith({
+        email: registerDto.email,
+        name: registerDto.name,
+        verificationLink: expect.stringContaining('verification-token-123'),
+        expirationHours: 24
+      });
 
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('company_user');
-      expect(mockAuditService.logEvent).toHaveBeenCalled();
-      expect(result.user.user_metadata).toHaveProperty('companyId', registerDto.companyId);
+      expect(result).toEqual({
+        user: {
+          id: mockUser.id,
+          email: mockUser.email,
+          user_metadata: {
+            name: mockUser.user_metadata.name,
+          },
+          created_at: mockUser.created_at,
+        },
+        session: {
+          access_token: mockSession.access_token,
+          refresh_token: mockSession.refresh_token,
+          expires_at: mockSession.expires_at,
+        },
+      });
     });
 
     it('should throw ConflictException when email already exists', async () => {
@@ -707,6 +754,205 @@ describe('AuthService', () => {
       await expect(service.refreshToken(refreshToken)).rejects.toThrow(
         UnauthorizedException,
       );
+    });
+  });
+
+  describe('verifyEmail', () => {
+    it('should verify email successfully', async () => {
+      // Arrange
+      const verifyEmailDto = {
+        token: 'valid-token',
+      };
+
+      const mockUser = {
+        id: 'user-1',
+        email: 'user@example.com',
+        email_confirmed_at: null,
+        user_metadata: {},
+      };
+
+      mockSupabaseClient.auth.verifyOtp.mockResolvedValueOnce({
+        data: {
+          user: mockUser,
+        },
+        error: null,
+      });
+
+      mockSupabaseClient.auth.updateUser.mockResolvedValueOnce({
+        data: {
+          user: {
+            ...mockUser,
+            user_metadata: {
+              email_verified: true,
+              onboarding_status: 'EMAIL_VERIFIED',
+            },
+          },
+        },
+        error: null,
+      });
+
+      // Mock del servicio de auditoría
+      mockAuditService.logEvent.mockResolvedValueOnce({});
+
+      // Act
+      const result = await service.verifyEmail(verifyEmailDto);
+
+      // Assert
+      expect(mockSupabaseClient.auth.verifyOtp).toHaveBeenCalledWith({
+        token: 'valid-token',
+        type: 'email',
+        email: ''
+      });
+      expect(mockSupabaseClient.auth.updateUser).toHaveBeenCalledWith({
+        data: {
+          email_verified: true,
+          onboarding_status: 'EMAIL_VERIFIED'
+        }
+      });
+      expect(mockAuditService.logEvent).toHaveBeenCalled();
+      expect(result).toEqual({
+        success: true,
+        message: 'Email verificado correctamente',
+        userId: 'user-1',
+      });
+    });
+
+    it('should throw BadRequestException for invalid token', async () => {
+      // Arrange
+      const verifyEmailDto = {
+        token: 'invalid-token',
+      };
+
+      mockSupabaseClient.auth.verifyOtp.mockResolvedValueOnce({
+        data: { user: null },
+        error: {
+          message: 'Invalid token',
+        },
+      });
+
+      // Act & Assert
+      await expect(service.verifyEmail(verifyEmailDto)).rejects.toThrow(BadRequestException);
+      expect(mockSupabaseClient.auth.verifyOtp).toHaveBeenCalled();
+      expect(mockSupabaseClient.auth.updateUser).not.toHaveBeenCalled();
+      expect(mockAuditService.logEvent).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException if user not found', async () => {
+      // Arrange
+      const verifyEmailDto = {
+        token: 'valid-token',
+      };
+
+      mockSupabaseClient.auth.verifyOtp.mockResolvedValueOnce({
+        data: { user: null },
+        error: null,
+      });
+
+      // Act & Assert
+      await expect(service.verifyEmail(verifyEmailDto)).rejects.toThrow(BadRequestException);
+      expect(mockSupabaseClient.auth.verifyOtp).toHaveBeenCalled();
+      expect(mockSupabaseClient.auth.updateUser).not.toHaveBeenCalled();
+      expect(mockAuditService.logEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getOnboardingStatus', () => {
+    it('should return complete onboarding status', async () => {
+      // Arrange
+      const userId = 'user-1';
+
+      // Mock para obtener el usuario
+      mockSupabaseClient.auth.admin.getUserById.mockResolvedValueOnce({
+        data: {
+          user: {
+            id: userId,
+            email: 'user@example.com',
+            email_confirmed_at: '2023-01-01T00:00:00.000Z', // Email verificado
+            user_metadata: {},
+          },
+        },
+        error: null,
+      });
+
+      // Mock para contar compañías del usuario
+      mockSupabaseClient.from.mockReturnValueOnce({
+        select: jest.fn().mockReturnValueOnce({
+          eq: jest.fn().mockReturnValueOnce({
+            count: 2,
+            error: null,
+          }),
+        }),
+      });
+
+      // Act
+      const result = await service.getOnboardingStatus(userId);
+
+      // Assert
+      expect(mockSupabaseClient.auth.admin.getUserById).toHaveBeenCalledWith(userId);
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('company_user');
+      expect(result).toEqual({
+        hasVerifiedEmail: true,
+        hasCompany: true,
+        companies: [],
+      });
+    });
+
+    it('should return status for user without verified email', async () => {
+      // Arrange
+      const userId = 'user-1';
+
+      // Mock para obtener el usuario (email no verificado)
+      mockSupabaseClient.auth.admin.getUserById.mockResolvedValueOnce({
+        data: {
+          user: {
+            id: userId,
+            email: 'user@example.com',
+            email_confirmed_at: null, // Email no verificado
+            user_metadata: {},
+          },
+        },
+        error: null,
+      });
+
+      // Mock para contar compañías del usuario
+      mockSupabaseClient.from.mockReturnValueOnce({
+        select: jest.fn().mockReturnValueOnce({
+          eq: jest.fn().mockReturnValueOnce({
+            count: 0,
+            error: null,
+          }),
+        }),
+      });
+
+      // Act
+      const result = await service.getOnboardingStatus(userId);
+
+      // Assert
+      expect(mockSupabaseClient.auth.admin.getUserById).toHaveBeenCalledWith(userId);
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('company_user');
+      expect(result).toEqual({
+        hasVerifiedEmail: false,
+        hasCompany: false,
+        companies: [],
+      });
+    });
+
+    it('should throw BadRequestException if user not found', async () => {
+      // Arrange
+      const userId = 'non-existent-user';
+
+      // Mock para obtener el usuario (no encontrado)
+      mockSupabaseClient.auth.admin.getUserById.mockResolvedValueOnce({
+        data: { user: null },
+        error: {
+          message: 'User not found',
+        },
+      });
+
+      // Act & Assert
+      await expect(service.getOnboardingStatus(userId)).rejects.toThrow(BadRequestException);
+      expect(mockSupabaseClient.auth.admin.getUserById).toHaveBeenCalledWith(userId);
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,5 +1,5 @@
-import { Body, Controller, Headers, Post, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import { Body, Controller, Headers, Post, UseGuards, Get, Param, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import {
   LoginDto,
@@ -12,10 +12,14 @@ import {
   ResetPasswordResponseDto,
   UpdatePasswordResponseDto,
   RefreshTokenResponseDto,
-  AuthErrorResponseDto
+  AuthErrorResponseDto,
+  VerifyEmailDto,
+  VerifyEmailResponseDto,
+  OnboardingStatusResponseDto
 } from './dto';
 import { JwtGuard } from './jwt/jwt.guard';
 import { SkipCompanyContext } from '../common/decorators/company-context.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -43,6 +47,41 @@ export class AuthController {
   @Post('register')
   async register(@Body() registerDto: RegisterDto): Promise<RegisterResponseDto> {
     return this.authService.register(registerDto);
+  }
+
+  @ApiOperation({ summary: 'Verificar email de usuario' })
+  @ApiBody({ type: VerifyEmailDto })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Email verificado exitosamente',
+    type: VerifyEmailResponseDto 
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'Token inválido o expirado',
+    type: AuthErrorResponseDto 
+  })
+  @Post('verify-email')
+  async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto): Promise<VerifyEmailResponseDto> {
+    return this.authService.verifyEmail(verifyEmailDto);
+  }
+
+  @ApiOperation({ summary: 'Verificar estado de onboarding del usuario' })
+  @ApiBearerAuth()
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Estado de onboarding obtenido exitosamente',
+    type: OnboardingStatusResponseDto 
+  })
+  @ApiResponse({ 
+    status: 401, 
+    description: 'No autorizado',
+    type: AuthErrorResponseDto 
+  })
+  @Get('onboarding-status')
+  @UseGuards(JwtGuard)
+  async getOnboardingStatus(@CurrentUser() user: any): Promise<OnboardingStatusResponseDto> {
+    return this.authService.getOnboardingStatus(user.id);
   }
 
   @ApiOperation({ summary: 'Iniciar sesión' })
@@ -150,5 +189,40 @@ export class AuthController {
   @Post('refresh-token')
   async refreshToken(@Body() body: { refresh_token: string }): Promise<RefreshTokenResponseDto> {
     return this.authService.refreshToken(body.refresh_token);
+  }
+
+  @ApiOperation({ summary: 'Reenviar email de verificación' })
+  @ApiBearerAuth()
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Email de verificación reenviado exitosamente',
+    schema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          example: true
+        },
+        message: {
+          type: 'string',
+          example: 'Email de verificación enviado'
+        }
+      }
+    }
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'Error al reenviar email',
+    type: AuthErrorResponseDto 
+  })
+  @ApiResponse({ 
+    status: 401, 
+    description: 'No autorizado',
+    type: AuthErrorResponseDto 
+  })
+  @Post('resend-verification-email')
+  @UseGuards(JwtGuard)
+  async resendVerificationEmail(@CurrentUser() user: any): Promise<{ success: boolean, message: string }> {
+    return this.authService.resendVerificationEmail(user.id);
   }
 }

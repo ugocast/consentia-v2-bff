@@ -9,6 +9,8 @@ import { UsersModule } from '../users/users.module';
 import { CommonModule } from '../common/common.module';
 import { PermissionsService } from './permissions/permissions.service';
 import { CompanyUsersModule } from '../company-users/company-users.module';
+import { EmailModule } from '../common/services/email/email.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { CompanyUsersModule } from '../company-users/company-users.module';
     forwardRef(() => UsersModule),
     forwardRef(() => CompanyUsersModule),
     forwardRef(() => CommonModule),
+    EmailModule,
+    ConfigModule,
   ],
   providers: [
     AuthService, 

@@ -201,6 +201,73 @@ export class VerifyTokenResponseDto {
 }
 
 /**
+ * DTO para respuesta de verificación de email
+ */
+export class VerifyEmailResponseDto {
+  @ApiProperty({
+    description: 'Indicador de éxito de la operación',
+    example: true
+  })
+  success: boolean;
+
+  @ApiProperty({
+    description: 'Mensaje descriptivo del resultado',
+    example: 'Email verificado correctamente'
+  })
+  message: string;
+
+  @ApiProperty({
+    description: 'ID del usuario',
+    example: '123e4567-e89b-12d3-a456-426614174000'
+  })
+  userId: string;
+}
+
+/**
+ * DTO para respuesta de estado de onboarding
+ */
+export class OnboardingStatusResponseDto {
+  @ApiProperty({
+    description: 'Indica si el email del usuario ha sido verificado',
+    example: true
+  })
+  hasVerifiedEmail: boolean;
+
+  @ApiProperty({
+    description: 'Indica si el usuario pertenece a alguna compañía',
+    example: false
+  })
+  hasCompany: boolean;
+
+  @ApiProperty({
+    description: 'Lista de compañías a las que pertenece el usuario',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          example: '123e4567-e89b-12d3-a456-426614174000'
+        },
+        name: {
+          type: 'string',
+          example: 'Acme Inc.'
+        },
+        role: {
+          type: 'string',
+          example: 'ADMIN'
+        }
+      }
+    }
+  })
+  companies: Array<{
+    id: string;
+    name: string;
+    role: string;
+  }>;
+}
+
+/**
  * DTO para respuestas de error estandarizadas
  */
 export class AuthErrorResponseDto {

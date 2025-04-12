@@ -1,9 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { mockSupabaseClient } from '../common/mocks/supabase.mock';
 import { UpdateUserDto } from './dto/user.dto';
 import * as supabaseConfig from '../config/supabase.config';
+import { AuditService } from '../common/audit/audit.service';
+import { SelectActiveCompanyDto } from './dto/select-active-company.dto';
 
 // Mock del módulo de configuración de Supabase
 jest.mock('../config/supabase.config', () => ({
@@ -19,8 +21,15 @@ mockSupabaseClient.auth.admin = {
   listUsers: jest.fn(),
 };
 
+// Mock de AuditService
+const mockAuditService = {
+  logEvent: jest.fn(),
+};
+
 describe('UsersService', () => {
   let service: UsersService;
+  let mockSupabaseClient;
+  let mockSupabaseAdminClient;
 
   beforeEach(async () => {
     // Resetear todos los mocks antes de cada prueba
@@ -38,8 +47,44 @@ describe('UsersService', () => {
       mockSupabaseClient,
     );
 
+    // Crear mock para la respuesta de Supabase
+    mockSupabaseClient = {
+      from: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn(),
+      maybeSingle: jest.fn(),
+    };
+
+    mockSupabaseAdminClient = {
+      auth: {
+        admin: {
+          getUserById: jest.fn(),
+          updateUserById: jest.fn(),
+          deleteUser: jest.fn(),
+          listUsers: jest.fn(),
+        },
+      },
+    };
+
+    // Configurar el mock de createSupabaseClient
+    (supabaseConfig.createSupabaseClient as jest.Mock).mockImplementation((options) => {
+      if (options && options.useServiceKey) {
+        return mockSupabaseAdminClient;
+      }
+      return mockSupabaseClient;
+    });
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [UsersService],
+      providers: [
+        UsersService,
+        {
+          provide: AuditService,
+          useValue: mockAuditService,
+        },
+      ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
@@ -435,6 +480,192 @@ describe('UsersService', () => {
       await expect(service.getAllUsers()).rejects.toThrow(
         InternalServerErrorException,
       );
+    });
+  });
+
+  describe('setActiveCompany', () => {
+    it('should set active company for user', async () => {
+      // Arrange
+      const userId = 'user-1';
+      const selectActiveCompanyDto: SelectActiveCompanyDto = {
+        companyId: 'company-1',
+      };
+
+      // Mock para verificar pertenencia a la compañía
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: {
+          id: 'company-user-1',
+          company: {
+            id: 'company-1',
+            name: 'Test Company',
+          },
+        },
+        error: null,
+      });
+
+      // Mock para verificar si ya existe un registro de compañía activa
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+        data: {
+          id: 'active-company-1',
+        },
+        error: null,
+      });
+
+      // Mock para actualizar el registro existente
+      mockSupabaseClient.eq.mockResolvedValueOnce({
+        error: null,
+      });
+
+      // Mock para actualizar los metadatos del usuario
+      mockSupabaseAdminClient.auth.admin.updateUserById.mockResolvedValueOnce({
+        data: {},
+        error: null,
+      });
+
+      // Act
+      const result = await service.setActiveCompany(userId, selectActiveCompanyDto);
+
+      // Assert
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('company_user');
+      expect(mockSupabaseClient.select).toHaveBeenCalledWith('id, company:company_id(id, name)');
+      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('auth_id', userId);
+      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('company_id', 'company-1');
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('user_active_company');
+      expect(mockSupabaseClient.update).toHaveBeenCalled();
+      expect(mockSupabaseAdminClient.auth.admin.updateUserById).toHaveBeenCalledWith(
+        userId,
+        {
+          user_metadata: {
+            active_company_id: 'company-1',
+            onboarding_status: 'ONBOARDING_COMPLETED'
+          },
+        }
+      );
+      expect(mockAuditService.logEvent).toHaveBeenCalled();
+      expect(result).toEqual({
+        success: true,
+        message: 'Compañía activa establecida correctamente',
+        companyId: 'company-1',
+        companyName: 'Test Company',
+      });
+    });
+
+    it('should create new active company record if none exists', async () => {
+      // Arrange
+      const userId = 'user-1';
+      const selectActiveCompanyDto: SelectActiveCompanyDto = {
+        companyId: 'company-1',
+      };
+
+      // Mock para verificar pertenencia a la compañía
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: {
+          id: 'company-user-1',
+          company: {
+            id: 'company-1',
+            name: 'Test Company',
+          },
+        },
+        error: null,
+      });
+
+      // Mock para verificar si ya existe un registro de compañía activa (no existe)
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+        data: null,
+        error: null,
+      });
+
+      // Mock para crear un nuevo registro
+      mockSupabaseClient.insert.mockResolvedValueOnce({
+        error: null,
+      });
+
+      // Mock para actualizar los metadatos del usuario
+      mockSupabaseAdminClient.auth.admin.updateUserById.mockResolvedValueOnce({
+        data: {},
+        error: null,
+      });
+
+      // Act
+      const result = await service.setActiveCompany(userId, selectActiveCompanyDto);
+
+      // Assert
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('company_user');
+      expect(mockSupabaseClient.select).toHaveBeenCalledWith('id, company:company_id(id, name)');
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('user_active_company');
+      expect(mockSupabaseClient.insert).toHaveBeenCalled();
+      expect(mockSupabaseAdminClient.auth.admin.updateUserById).toHaveBeenCalledWith(
+        userId,
+        expect.any(Object)
+      );
+      expect(mockAuditService.logEvent).toHaveBeenCalled();
+      expect(result.success).toBe(true);
+    });
+
+    it('should throw BadRequestException if user does not belong to company', async () => {
+      // Arrange
+      const userId = 'user-1';
+      const selectActiveCompanyDto: SelectActiveCompanyDto = {
+        companyId: 'company-2',
+      };
+
+      // Mock para verificar pertenencia a la compañía (no pertenece)
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: null,
+        error: {
+          message: 'No data found',
+        },
+      });
+
+      // Act & Assert
+      await expect(service.setActiveCompany(userId, selectActiveCompanyDto))
+        .rejects.toThrow(BadRequestException);
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('company_user');
+      expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('user_active_company');
+      expect(mockAuditService.logEvent).not.toHaveBeenCalled();
+    });
+
+    it('should throw InternalServerErrorException if database error occurs', async () => {
+      // Arrange
+      const userId = 'user-1';
+      const selectActiveCompanyDto: SelectActiveCompanyDto = {
+        companyId: 'company-1',
+      };
+
+      // Mock para verificar pertenencia a la compañía
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: {
+          id: 'company-user-1',
+          company: {
+            id: 'company-1',
+            name: 'Test Company',
+          },
+        },
+        error: null,
+      });
+
+      // Mock para verificar si ya existe un registro de compañía activa
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+        data: {
+          id: 'active-company-1',
+        },
+        error: null,
+      });
+
+      // Mock para actualizar el registro existente (falla)
+      mockSupabaseClient.eq.mockResolvedValueOnce({
+        error: {
+          message: 'Database error',
+        },
+      });
+
+      // Act & Assert
+      await expect(service.setActiveCompany(userId, selectActiveCompanyDto))
+        .rejects.toThrow(InternalServerErrorException);
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('company_user');
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('user_active_company');
+      expect(mockSupabaseClient.update).toHaveBeenCalled();
+      expect(mockAuditService.logEvent).not.toHaveBeenCalled();
     });
   });
 });

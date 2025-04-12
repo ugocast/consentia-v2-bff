@@ -1,8 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { UpdateUserDto, UserDto } from './dto/user.dto';
 import { NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { SelectActiveCompanyDto, ActiveCompanyResponseDto } from './dto/select-active-company.dto';
 
 // Mock del servicio de usuarios siguiendo el patrón AAA
 const mockUsersService = {
@@ -10,7 +13,12 @@ const mockUsersService = {
   updateUser: jest.fn(),
   deleteUser: jest.fn(),
   getAllUsers: jest.fn(),
+  setActiveCompany: jest.fn(),
 };
+
+// Mock de los guardias
+const mockJwtAuthGuard = { canActivate: jest.fn().mockReturnValue(true) };
+const mockRolesGuard = { canActivate: jest.fn().mockReturnValue(true) };
 
 // Crear un usuario mock para las pruebas
 const createMockUser = (id = 'user-id', overrides = {}) => ({
@@ -24,10 +32,9 @@ const createMockUser = (id = 'user-id', overrides = {}) => ({
 
 describe('UsersController', () => {
   let controller: UsersController;
-  let usersService: UsersService;
+  let service: UsersService;
 
   beforeEach(async () => {
-    // Arrange - Setup
     // Resetear todos los mocks antes de cada prueba
     jest.clearAllMocks();
 
@@ -39,10 +46,15 @@ describe('UsersController', () => {
           useValue: mockUsersService,
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue(mockJwtAuthGuard)
+      .overrideGuard(RolesGuard)
+      .useValue(mockRolesGuard)
+      .compile();
 
     controller = module.get<UsersController>(UsersController);
-    usersService = module.get<UsersService>(UsersService);
+    service = module.get<UsersService>(UsersService);
   });
 
   it('should be defined', () => {
@@ -272,6 +284,31 @@ describe('UsersController', () => {
       // Act & Assert
       await expect(controller.getAllUsers()).rejects.toThrow(InternalServerErrorException);
       expect(mockUsersService.getAllUsers).toHaveBeenCalled();
+    });
+  });
+
+  describe('setActiveCompany', () => {
+    it('should set active company for user', async () => {
+      // Arrange
+      const user = { id: 'user-1' };
+      const selectActiveCompanyDto: SelectActiveCompanyDto = {
+        companyId: 'company-1',
+      };
+      const mockActiveCompanyResponse: ActiveCompanyResponseDto = {
+        success: true,
+        message: 'Compañía activa establecida correctamente',
+        companyId: 'company-1',
+        companyName: 'Test Company',
+      };
+
+      mockUsersService.setActiveCompany.mockResolvedValue(mockActiveCompanyResponse);
+
+      // Act
+      const result = await controller.setActiveCompany(user, selectActiveCompanyDto);
+
+      // Assert
+      expect(mockUsersService.setActiveCompany).toHaveBeenCalledWith(user.id, selectActiveCompanyDto);
+      expect(result).toEqual(mockActiveCompanyResponse);
     });
   });
 });

@@ -1,2 +1,25 @@
 export * from './auth.dto';
-export * from './standard-response.dto'; 
+// Exportamos selectivamente para evitar duplicados
+import { 
+  RegisterResponseDto, 
+  LoginResponseDto, 
+  LogoutResponseDto, 
+  RefreshTokenResponseDto, 
+  ResetPasswordResponseDto, 
+  UpdatePasswordResponseDto, 
+  AuthErrorResponseDto, 
+  VerifyEmailResponseDto,
+  VerifyTokenResponseDto
+} from './standard-response.dto';
+
+export { 
+  RegisterResponseDto, 
+  LoginResponseDto, 
+  LogoutResponseDto, 
+  RefreshTokenResponseDto, 
+  ResetPasswordResponseDto, 
+  UpdatePasswordResponseDto, 
+  AuthErrorResponseDto, 
+  VerifyEmailResponseDto,
+  VerifyTokenResponseDto
+}; 

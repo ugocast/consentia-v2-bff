@@ -5,15 +5,19 @@ import {
   Get,
   Patch,
   UseGuards,
+  Put,
+  Param,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from './enums/user-role.enum';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { UpdateUserDto } from './dto/user.dto';
+import { UpdateUserDto, UserDto } from './dto/user.dto';
+import { SelectActiveCompanyDto, ActiveCompanyResponseDto } from './dto/select-active-company.dto';
+import { SkipCompanyContext } from '../common/decorators/company-context.decorator';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -24,24 +28,34 @@ export class UsersController {
 
   @Get('me')
   @ApiOperation({ summary: 'Obtener perfil del usuario actual' })
-  @ApiResponse({ status: 200, description: 'Perfil de usuario obtenido correctamente' })
+  @ApiResponse({
+    status: 200,
+    description: 'Perfil del usuario',
+    type: UserDto,
+  })
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
-  async getCurrentUser(@CurrentUser('id') userId: string) {
-    return this.usersService.getCurrentUser(userId);
+  @SkipCompanyContext()
+  async getCurrentUser(@CurrentUser() user: any): Promise<UserDto> {
+    return this.usersService.getCurrentUser(user.id);
   }
 
-  @Patch('me')
-  @ApiOperation({ summary: 'Actualizar perfil del usuario actual' })
-  @ApiResponse({ status: 200, description: 'Perfil de usuario actualizado correctamente' })
+  @Put('me')
+  @ApiOperation({ summary: 'Actualizar perfil del usuario' })
+  @ApiResponse({
+    status: 200,
+    description: 'Perfil actualizado',
+    type: UserDto,
+  })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
+  @SkipCompanyContext()
   async updateUser(
-    @CurrentUser('id') userId: string,
+    @CurrentUser() user: any,
     @Body() updateUserDto: UpdateUserDto,
-  ) {
-    return this.usersService.updateUser(userId, updateUserDto);
+  ): Promise<UserDto> {
+    return this.usersService.updateUser(user.id, updateUserDto);
   }
 
   @Delete('me')
@@ -62,5 +76,26 @@ export class UsersController {
   @ApiResponse({ status: 403, description: 'Prohibido - se requiere rol admin' })
   async getAllUsers() {
     return this.usersService.getAllUsers();
+  }
+
+  @ApiOperation({ summary: 'Establecer compañía activa' })
+  @ApiResponse({
+    status: 200,
+    description: 'Compañía activa establecida',
+    type: ActiveCompanyResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'El usuario no pertenece a la compañía',
+  })
+  @ApiBody({ type: SelectActiveCompanyDto })
+  @ApiBearerAuth()
+  @Put('active-company')
+  @SkipCompanyContext()
+  async setActiveCompany(
+    @CurrentUser() user: any,
+    @Body() selectActiveCompanyDto: SelectActiveCompanyDto,
+  ): Promise<ActiveCompanyResponseDto> {
+    return this.usersService.setActiveCompany(user.id, selectActiveCompanyDto);
   }
 }
