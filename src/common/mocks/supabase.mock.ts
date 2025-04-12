@@ -12,62 +12,70 @@ export interface SupabaseResponse<T = any> {
 
 // Tipos para los mocks de Supabase
 export interface MockSupabaseClient {
-  from: any;
-  select: any;
-  insert: any;
-  update: any;
-  delete: any;
-  limit: any;
-  where: any;
-  values: any;
-  returning: any;
-  execute: any;
-  single: any;
-  order: any;
-  range: any;
-  count: any;
-  eq: any;
-  neq: any;
-  is: any;
-  in: any;
-  gte: any;
-  lte: any;
-  contains: any;
-  then?: any;
+  from: jest.Mock;
+  select: jest.Mock;
+  insert: jest.Mock;
+  update: jest.Mock;
+  delete: jest.Mock;
+  limit: jest.Mock;
+  where: jest.Mock;
+  values: jest.Mock;
+  returning: jest.Mock;
+  execute: jest.Mock;
+  single: jest.Mock;
+  order: jest.Mock;
+  range: jest.Mock;
+  count: jest.Mock;
+  eq: jest.Mock;
+  neq: jest.Mock;
+  is: jest.Mock;
+  in: jest.Mock;
+  gte: jest.Mock;
+  lte: jest.Mock;
+  contains: jest.Mock;
   auth: {
-    signUp: any;
-    signInWithPassword: any;
-    signOut: any;
-    getUser: any;
-    setSession: any;
-    resetPasswordForEmail: any;
-    updateUser: any;
-    refreshSession: any;
+    signUp: jest.Mock;
+    signInWithPassword: jest.Mock;
+    signOut: jest.Mock;
+    getUser: jest.Mock;
+    setSession: jest.Mock;
+    resetPasswordForEmail: jest.Mock;
+    updateUser: jest.Mock;
+    refreshSession: jest.Mock;
+    verifyOtp: jest.Mock;
+    admin: {
+      getUserById: jest.Mock;
+      updateUserById: jest.Mock;
+      deleteUser: jest.Mock;
+      listUsers: jest.Mock;
+      createUser: jest.Mock;
+      inviteUserByEmail: jest.Mock;
+      generateLink: jest.Mock;
+    };
   };
-  // Propiedades adicionales para compatibilidad con SupabaseClient
-  supabaseUrl?: string;
-  supabaseKey?: string;
-  realtime?: any;
-  realtimeUrl?: string;
-  authUrl?: string;
-  storageUrl?: string;
-  functionsUrl?: string;
-  rest?: any;
-  // Otras propiedades adicionales para compatibilidad con SupabaseClient
-  storageKey?: string;
-  headers?: any;
-  schema?: any;
-  getChannels?: any;
-  removeChannel?: any;
-  removeAllChannels?: any;
-  listBuckets?: any;
-  fetchRelease?: any;
-  // Otras propiedades adicionales
-  channel?: any;
-  storage?: any;
-  rpc?: any;
-  functions?: any;
-  queryBuilder?: any;
+  // Propiedades de compatibilidad
+  supabaseUrl: string;
+  supabaseKey: string;
+  realtime: Record<string, any>;
+  realtimeUrl: string;
+  authUrl: string;
+  storageUrl: string;
+  functionsUrl: string;
+  rest: Record<string, any>;
+  storageKey: string;
+  headers: Record<string, any>;
+  schema: string;
+  getChannels: jest.Mock;
+  removeChannel: jest.Mock;
+  removeAllChannels: jest.Mock;
+  listBuckets: jest.Mock;
+  fetchRelease: jest.Mock;
+  // Otras propiedades
+  channel: Record<string, any>;
+  storage: Record<string, any>;
+  rpc: jest.Mock;
+  functions: Record<string, any>;
+  queryBuilder: Record<string, any>;
 }
 
 // Cliente mock de Supabase
@@ -102,6 +110,16 @@ export const mockSupabaseClient: MockSupabaseClient = {
     resetPasswordForEmail: jest.fn(),
     updateUser: jest.fn(),
     refreshSession: jest.fn(),
+    verifyOtp: jest.fn(),
+    admin: {
+      getUserById: jest.fn(),
+      updateUserById: jest.fn(),
+      deleteUser: jest.fn(),
+      listUsers: jest.fn(),
+      createUser: jest.fn(),
+      inviteUserByEmail: jest.fn(),
+      generateLink: jest.fn(),
+    },
   },
   // Valores para las propiedades de compatibilidad
   supabaseUrl: 'https://example.com',
@@ -140,16 +158,27 @@ export function setupSupabaseError(error: any) {
 
 // Función para resetear los mocks
 export function resetSupabaseMocks() {
-  // Limpiar todos los mocks
-  Object.keys(mockSupabaseClient).forEach((key) => {
-    if (key === 'auth') {
-      Object.keys(mockSupabaseClient.auth).forEach((authKey) => {
-        mockSupabaseClient.auth[authKey].mockReset();
-      });
-    } else if (typeof mockSupabaseClient[key] === 'function') {
-      mockSupabaseClient[key].mockClear();
+  Object.values(mockSupabaseClient).forEach((value) => {
+    if (value && typeof value === 'object' && value.mockReset) {
+      value.mockReset();
     }
   });
+
+  // Resetear auth y sus métodos
+  Object.values(mockSupabaseClient.auth).forEach((method) => {
+    if (method && typeof method === 'object' && method.mockReset) {
+      method.mockReset();
+    }
+  });
+
+  // Resetear auth.admin y sus métodos
+  if (mockSupabaseClient.auth.admin) {
+    Object.values(mockSupabaseClient.auth.admin).forEach((method) => {
+      if (method && typeof method === 'function' && method.mockReset) {
+        method.mockReset();
+      }
+    });
+  }
 
   // Restablecer comportamiento por defecto
   mockSupabaseClient.from.mockReturnThis();
