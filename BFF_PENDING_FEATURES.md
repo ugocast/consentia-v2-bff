@@ -45,12 +45,12 @@ Tras analizar la implementación actual del Backend for Frontend (BFF) de Consen
 - **Componentes Frontend**: `CompanyList`, `CompanyDetail`, `CompanyEditForm`
 - **Estado**: ✅ (CRUD básico probablemente soportado por `CompaniesService`, aunque la cobertura de pruebas es baja).
 
-### 1.1b Creación de Empresa por Usuario Registrado ⏳
+### 1.1b Creación de Empresa por Usuario Registrado ✅
 - **Endpoint**: `/api/v1/users/me/companies` (POST)
 - **Descripción**: Permitir que un usuario ya registrado y verificado cree una nueva empresa y sea automáticamente asignado como administrador de la misma.
 - **Tablas**: `company`, `company_user`, `user_active_company`
 - **Componentes Frontend**: `CreateCompanyForm`, `CompanyOnboardingPage`
-- **Estado**: ⏳ (Parcialmente implementado, pero necesita integración con el nuevo flujo de registro secuencial).
+- **Estado**: ✅ (Completamente implementado con el endpoint que permite a un usuario verificado crear una empresa y ser asignado como administrador).
 
 ### 1.2 Endpoints para Configuración de Empresas ✅
 - **Endpoint**: `/api/v1/companies/:id/config` (GET, PUT/PATCH)
@@ -341,7 +341,7 @@ Tras analizar la implementación actual del Backend for Frontend (BFF) de Consen
     *   ✅ Implementar registro de usuario independiente (#0.1)
     *   ✅ Implementar verificación de correo electrónico (#0.2)
     *   ✅ Implementar detección de estado de onboarding (#0.3)
-    *   ⏳ Implementar creación de empresa para usuario existente (#1.1b)
+    *   ✅ Implementar creación de empresa para usuario existente (#1.1b)
     *   ✅ Implementar sistema de invitaciones para usuarios existentes/nuevos (#2.4)
     *   ✅ Implementar selección de empresa activa (#1.4)
 
