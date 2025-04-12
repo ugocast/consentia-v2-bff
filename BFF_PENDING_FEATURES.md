@@ -5,53 +5,50 @@
 Este documento detalla el estado actual de implementación del Backend for Frontend (BFF) de Consentia, identificando las características ya implementadas y aquellas que requieren desarrollo adicional para aprovechar completamente el esquema de base de datos y satisfacer los requerimientos de la arquitectura frontend.
 
 **Leyenda de Estado:**
-*   ✅ Implementado (Funcionalidad principal existe, pruebas unitarias/E2E completas).
-*   ⏳ Parcialmente Implementado / En Progreso (Funcionalidad existe pero puede requerir ajustes o pruebas adicionales).
-*   🚧 Pendiente de Implementación (Funcionalidad requerida pero aún no implementada).
+*   ✅ Implementado (Funcionalidad principal existe, pruebas unitarias completas).
+*   ⏳ Parcialmente Implementado / En Progreso / Necesita Pruebas (Funcionalidad existe pero requiere correcciones o pruebas adicionales).
+*   🚧 Pendiente de Implementación (Funcionalidad requerida no implementada).
 
 ## Características Implementadas ✅
 
-### 1. Gestión de Autenticación y Registro Secuencial
+### 1. Autenticación y Registro Secuencial de Usuarios
 - **Endpoints**: 
-  - `/api/v1/auth/register` - Registro de usuario sin empresa
+  - `/api/v1/auth/register` - Registro de usuario
   - `/api/v1/auth/verify-email` - Verificación de email
   - `/api/v1/auth/onboarding-status` - Estado de configuración del usuario
 - **Descripción**: Flujo completo de registro secuencial donde el usuario primero crea una cuenta, verifica su email, y luego se asocia a una empresa.
 - **Detalles implementados**:
-  - Registro con nombre, email y contraseña sin asociación inmediata a una empresa
-  - Envío automatizado de emails de verificación
-  - Verificación de email mediante token seguro
-  - Endpoint para obtener estado actual del onboarding del usuario
-  - Pruebas unitarias completas
+  - Registro con nombre, email y contraseña sin asociación inmediata a empresa
+  - Envío automatizado de emails de verificación con tokens seguros
+  - Verificación de email y actualización del estado de onboarding
+  - Pruebas unitarias completas para endpoints y servicios relacionados
 
 ### 2. Sistema de Invitaciones
 - **Endpoints**: 
   - `/api/v1/invitations` - CRUD de invitaciones
-  - `/api/v1/invitations/verify/:token` - Verificación de token de invitación
+  - `/api/v1/invitations/verify/:token` - Verificación de token
   - `/api/v1/invitations/accept` - Aceptación de invitación
-- **Descripción**: Sistema completo para invitar usuarios a empresas, tanto para usuarios nuevos como existentes.
+- **Descripción**: Sistema completo para invitar usuarios a empresas.
 - **Detalles implementados**:
   - Creación de invitaciones con token seguro y fecha de expiración
   - Envío de emails personalizados de invitación
-  - Verificación de tokens de invitación
-  - Proceso de aceptación que maneja tanto usuarios nuevos como existentes
-  - Regeneración de tokens expirados
+  - Manejo diferenciado para usuarios nuevos y existentes
+  - Regeneración de tokens
   - Cancelación de invitaciones
-  - Auditoría completa del proceso
+  - Pruebas unitarias completas
 
 ### 3. Selección de Empresa Activa
-- **Endpoints**: 
-  - `/api/v1/users/active-company` - Obtener/establecer empresa activa del usuario
-- **Descripción**: Permite a usuarios con múltiples empresas seleccionar cuál usar en la sesión actual.
+- **Endpoint**: `/api/v1/users/active-company`
+- **Descripción**: Permite a usuarios pertenecer a múltiples empresas y seleccionar cuál usar.
 - **Detalles implementados**:
   - Obtención de empresa activa actual
   - Establecimiento de nueva empresa activa
   - Validación de pertenencia del usuario a la empresa
-  - Manejo de contexto de empresa en sesión
+  - Pruebas unitarias para estas funcionalidades
 
 ### 4. Gestión de Empresas y Configuraciones
 - **Endpoint**: `/api/v1/companies/:id/config`
-- **Descripción**: Gestión de configuraciones personalizadas por empresa
+- **Descripción**: Gestión de configuraciones personalizadas por empresa.
 - **Detalles implementados**:
   - Validación de configuración de notificaciones
   - Validación de configuración de privacidad (30-365 días)
@@ -60,100 +57,73 @@ Este documento detalla el estado actual de implementación del Backend for Front
 
 ### 5. Gestión de Planes de Suscripción
 - **Endpoint**: `/api/v1/companies/:id/subscription`
-- **Descripción**: Administración de planes (FREE, STANDARD, PREMIUM)
+- **Descripción**: Administración de planes (FREE, STANDARD, PREMIUM).
 - **Detalles implementados**:
   - Validación de fechas de suscripción
   - Validación de métodos de pago
   - Validación de información de facturación
   - Guard de permisos específico por empresa
 
-### 6. Gestión de Usuarios de Empresa
-- **Endpoints**: 
-  - `/api/v1/companies/:companyId/users` - CRUD de usuarios
-  - `/api/v1/companies/:companyId/users/:userId/role` - Gestión de roles
-  - `/api/v1/companies/:companyId/users/me` - Perfil del usuario actual
-- **Descripción**: Administración completa de usuarios dentro de una empresa
-- **Detalles implementados**:
-  - CRUD completo de usuarios de empresa
-  - Asignación y modificación de roles (ADMIN, MANAGER, OPERATOR, AUDITOR)
-  - Gestión de estado de usuarios (activo/inactivo)
-  - Edición de perfil personal
-  - Validación de permisos por rol
-
-### 7. Gestión de Tipos de Datos
-- **Endpoint**: `/api/v1/companies/:companyId/data-types`
-- **Descripción**: CRUD para tipos de datos en consentimientos
-- **Detalles implementados**:
-  - CRUD completo de tipos de datos
-  - Validación de roles y permisos
-  - Versionamiento de tipos de datos
-  - Integración con Supabase
-  - Auditoría de cambios
-  - Logging y manejo de errores
-
-### 8. Operaciones Masivas
-- **Endpoint**: `/api/v1/consents/bulk`
-- **Descripción**: Procesamiento de múltiples consentimientos
-- **Detalles implementados**:
-  - CRUD completo de operaciones masivas
-  - Estados de operación (PENDING, PROCESSING, COMPLETED, FAILED, CANCELLED)
-  - Auditoría de operaciones
-  - Validación de permisos por compañía
-  - Procesamiento de diferentes tipos de operaciones
-
-### 9. Reportes y Exportación
+### 6. Reportes y Exportación
 - **Endpoints**: 
   - `/api/v1/reports/consents` - Reportes de consentimientos
   - `/api/v1/reports/audit` - Reportes de auditoría
   - `/api/v1/reports/metrics` - Métricas del sistema
-- **Descripción**: Generación de reportes y exportación de datos
+- **Descripción**: Generación de reportes y exportación de datos.
 - **Detalles implementados**:
   - Filtrado por varios criterios (fecha, estado, etc.)
   - Exportación en diferentes formatos
   - Cálculo de métricas clave
   - Permisos por rol
 
-### 10. Seguridad y Auditoría Base
-- **Validaciones de Negocio**:
-  - Validación de configuración de empresa
-  - Validación de suscripción
-  - Validación de permisos por operación
-- **Validaciones de Permisos**:
-  - Guard específico para empresas
-  - Jerarquía de roles (ADMIN, MANAGER, OPERATOR, AUDITOR)
-  - Verificación de pertenencia a empresa
-- **Auditoría**:
-  - Registro de cambios en configuración
-  - Registro de cambios en suscripción
-  - Registro de actividades de usuarios
-  - Metadata detallada en logs
+### 7. Operaciones Masivas
+- **Endpoint**: `/api/v1/consents/bulk`
+- **Descripción**: Procesamiento de múltiples consentimientos.
+- **Detalles implementados**:
+  - CRUD completo de operaciones masivas
+  - Estados de operación (PENDING, PROCESSING, COMPLETED, FAILED, CANCELLED)
+  - Auditoría de operaciones
+  - Validación de permisos por compañía
 
 ## Características Parcialmente Implementadas ⏳
 
-### 1. Gestión de Políticas Legales
-- **Endpoint**: `/api/v1/companies/:companyId/policies`
-- **Descripción**: CRUD para políticas legales de la empresa
-- **Estado**: Controlador existe pero servicio con baja cobertura de pruebas
+### 1. Gestión de Usuarios de Empresa
+- **Endpoints**: 
+  - `/api/v1/companies/:companyId/users` - CRUD de usuarios
+  - `/api/v1/companies/:companyId/users/:userId/role` - Gestión de roles
+  - `/api/v1/companies/:companyId/users/me` - Perfil del usuario actual
+- **Estado**: Funcionalidad principal implementada con pruebas parciales.
+- **Pendiente**: Corregir errores en pruebas unitarias del controlador relacionados con `CurrentUser` decorator.
 
-### 2. Gestión de Sujetos de Datos
+### 2. Gestión de Tipos de Datos
+- **Endpoint**: `/api/v1/companies/:companyId/data-types`
+- **Estado**: Funcionalidad implementada pero con pruebas fallando.
+- **Pendiente**: Corregir problemas de autenticación en pruebas unitarias, especialmente con JWS.
+
+### 3. Gestión de Sujetos de Datos
 - **Endpoint**: `/api/v1/companies/:companyId/data-subjects`
-- **Descripción**: CRUD para sujetos de datos (titulares)
-- **Estado**: Implementación básica pero requiere mejoras en filtrado y pruebas
+- **Estado**: Implementación básica pero con errores en pruebas.
+- **Pendiente**: Corregir problemas con request context y tipado en las pruebas.
 
-### 3. Gestión de Consentimientos
+### 4. Gestión de Políticas Legales
+- **Endpoint**: `/api/v1/companies/:companyId/policies`
+- **Estado**: Controlador existe pero servicio con baja cobertura de pruebas.
+- **Pendiente**: Completar pruebas unitarias para el servicio.
+
+### 5. Gestión de Consentimientos
 - **Endpoint**: `/api/v1/companies/:companyId/consents`
-- **Descripción**: Administración de consentimientos
-- **Estado**: Funcionalidad básica implementada pero requiere mejoras en filtrado y pruebas
+- **Estado**: Funcionalidad básica implementada pero requiere mejoras.
+- **Pendiente**: Mejorar filtros y completar pruebas unitarias.
 
-### 4. Integraciones Externas
+### 6. Integraciones Externas
 - **Endpoint**: `/api/v1/companies/:companyId/integrations`
-- **Descripción**: Configuración de integraciones con sistemas externos
-- **Estado**: Implementación parcial, pruebas incompletas
+- **Estado**: Implementación parcial, pruebas incompletas.
+- **Pendiente**: Completar implementación y pruebas.
 
-### 5. Gestión de API Keys
+### 7. API Keys
 - **Endpoint**: `/api/v1/api-keys`
-- **Descripción**: Administración de claves de API para acceso programático
-- **Estado**: Módulo existe pero pruebas unitarias incompletas
+- **Estado**: Servicio implementado pero pruebas fallando.
+- **Pendiente**: Corregir problemas con tipado en mock de Supabase.
 
 ## Características Pendientes de Implementación 🚧
 
@@ -161,40 +131,58 @@ Este documento detalla el estado actual de implementación del Backend for Front
 - **Endpoints**: 
   - `/api/v1/portal/request-access` - Solicitud de acceso al portal
   - `/api/v1/portal/verify-access` - Verificación de acceso
-- **Descripción**: Portal de autogestión para sujetos de datos
+- **Descripción**: Portal de autogestión para sujetos de datos.
 
-### 2. Configuración de Webhooks
+### 2. Webhooks para Integraciones
 - **Endpoint**: `/api/v1/companies/:companyId/integrations/:id/webhooks`
-- **Descripción**: Configuración de URLs de callback para eventos
+- **Descripción**: Configuración de URLs de callback para eventos.
 
 ### 3. Sistema de Plantillas y Recordatorios
 - **Endpoints**: 
   - `/api/v1/companies/:companyId/templates` - Gestión de plantillas
   - `/api/v1/companies/:companyId/reminders` - Configuración de recordatorios
-- **Descripción**: Gestión de plantillas de comunicación y recordatorios automáticos
+- **Descripción**: Gestión de plantillas de comunicación y recordatorios automáticos.
 
 ### 4. Generación de PDFs de Consentimiento
 - **Endpoint**: `/api/v1/consents/:id/pdf`
-- **Descripción**: Generación de documentos PDF para consentimientos
+- **Descripción**: Generación de documentos PDF para consentimientos.
 
 ### 5. Panel de Tareas para Operadores
 - **Endpoint**: `/api/v1/companies/:companyId/tasks`
-- **Descripción**: Lista de tareas pendientes y elementos que requieren atención
+- **Descripción**: Lista de tareas pendientes y elementos que requieren atención.
+
+## Estado de Pruebas Unitarias
+
+### Pruebas Exitosas
+- ✅ `auth/auth.controller.spec.ts` - Todas las pruebas pasando, incluyendo los nuevos endpoints.
+- ✅ `invitations/invitations.controller.spec.ts` - Todas las pruebas pasando.
+
+### Pruebas con Problemas
+- ⚠️ `users/users.controller.spec.ts` - 7 pruebas fallando, 8 pasando.
+- ⚠️ `invitations/invitations.service.spec.ts` - Problemas con regenerateToken.
+- ⚠️ `data-types/data-types.service.spec.ts` - Errores con JWT y Supabase.
+- ⚠️ `bulk-operations/bulk-operations.service.spec.ts` - Dependencias no resueltas.
+- ⚠️ `company-users/company-users.controller.spec.ts` - Problemas con updateSelf.
+- ⚠️ `auth/auth.service.spec.ts` - Errores de tipado con auth.admin y verifyOtp.
 
 ## Priorización Recomendada
 
-### Alta Prioridad
-1. Completar pruebas para componentes parcialmente implementados (Políticas, Sujetos de Datos, Consentimientos)
-2. Portal para Sujetos de Datos (#1)
-3. Generación de PDFs de Consentimiento (#4)
+### Alta Prioridad (Correcciones)
+1. Corregir errores en pruebas unitarias existentes, especialmente:
+   - Tipado de mocks para Supabase (auth.admin, verifyOtp)
+   - Problemas con @CurrentUser decorator en controladores
+   - Errores en RequestWithCompanyContext
 
-### Media Prioridad
-1. Sistema de Plantillas y Recordatorios (#3)
-2. Panel de Tareas para Operadores (#5)
+### Media Prioridad (Completar funcionalidades)
+1. Completar Portal para Sujetos de Datos (#1)
+2. Mejorar pruebas e implementación de Gestión de Consentimientos
+3. Finalizar implementación de Políticas Legales
 
 ### Baja Prioridad
-1. Configuración de Webhooks (#2)
-2. Mejoras adicionales en reportes y exportación
+1. Sistema de Plantillas y Recordatorios (#3)
+2. Webhooks para Integraciones (#2)
+3. Generación de PDFs (#4)
+4. Panel de Tareas (#5)
 
 ## Mejoras de Seguridad Pendientes
 
@@ -207,6 +195,8 @@ Este documento detalla el estado actual de implementación del Backend for Front
 
 ## Conclusión
 
-El proyecto ha avanzado significativamente con la implementación del flujo secuencial de registro de usuarios, verificación de email y gestión de invitaciones, completando una parte crítica de la funcionalidad requerida. Estos cambios permiten un onboarding más flexible y una mejor experiencia de usuario.
+La implementación del flujo secuencial de registro de usuarios, verificación de email, sistema de invitaciones y selección de empresa activa proporciona una base sólida para el sistema. Estas funcionalidades críticas ahora están completamente implementadas y probadas.
 
-Las próximas fases de desarrollo deben enfocarse en completar las funcionalidades parcialmente implementadas, especialmente mejorando su cobertura de pruebas, y en agregar el portal para sujetos de datos como siguiente funcionalidad prioritaria. Este enfoque permitirá ofrecer una solución más completa para la gestión de consentimientos, beneficiando tanto a las empresas como a los titulares de los datos. 
+El enfoque inmediato debe ser corregir los problemas en las pruebas unitarias existentes, especialmente los relacionados con mocks de Supabase y decoradores personalizados. Una vez resueltos estos problemas, se puede avanzar con la implementación del portal para sujetos de datos como siguiente prioridad.
+
+La estrategia recomendada es incrementar la cobertura de pruebas para las funcionalidades parcialmente implementadas antes de agregar nuevas características, asegurando así una base estable para el desarrollo futuro. 
