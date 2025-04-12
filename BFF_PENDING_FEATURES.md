@@ -161,7 +161,6 @@ Este documento detalla el estado actual de implementación del Backend for Front
 ### Pruebas con Problemas
 - ⚠️ `users/users.controller.spec.ts` - 7 pruebas fallando, 8 pasando. Problemas con parámetros en métodos.
 - ⚠️ `users/users.service.spec.ts` - 11 pruebas fallando, 6 pasando. Progreso en la corrección de mocks.
-- ⚠️ `invitations/invitations.service.spec.ts` - Problemas con regenerateToken.
 - ⚠️ `data-types/data-types.service.spec.ts` - Errores con JWT y Supabase.
 - ⚠️ `bulk-operations/bulk-operations.service.spec.ts` - Dependencias no resueltas.
 - ⚠️ `company-users/company-users.controller.spec.ts` - Problemas con updateSelf.
@@ -170,6 +169,7 @@ Este documento detalla el estado actual de implementación del Backend for Front
 - ✅ Se ha corregido la implementación del mock de Supabase para incluir la propiedad `admin` en `auth` y el método `verifyOtp`.
 - ✅ Se han tipado correctamente los mocks para evitar errores en TypeScript.
 - ✅ Se ha mejorado la función `resetSupabaseMocks()` para limpiar correctamente todos los mocks anidados.
+- ✅ Se ha corregido el método `regenerateToken` en `InvitationsService` para usar el método `findOne` existente en lugar de realizar una consulta directamente, lo que ha solucionado las pruebas fallidas.
 
 ## Priorización Recomendada
 

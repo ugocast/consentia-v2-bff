@@ -549,19 +549,8 @@ export class InvitationsService {
    */
   async regenerateToken(id: string): Promise<InvitationDto> {
     try {
-      // Verificar si la invitación existe
-      const { data: invitation, error: findError } = await this.supabase
-        .from('invitation')
-        .select('*')
-        .eq('id', id)
-        .single();
-      
-      if (findError || !invitation) {
-        throw new NotFoundException({
-          code: ErrorCode.INVITATION_NOT_FOUND,
-          message: 'Invitación no encontrada'
-        });
-      }
+      // Verificar si la invitación existe usando el método findOne 
+      const invitation = await this.findOne(id);
       
       // Verificar que la invitación esté pendiente
       if (invitation.status !== InvitationStatus.PENDING) {

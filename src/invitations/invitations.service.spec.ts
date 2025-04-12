@@ -640,22 +640,34 @@ describe('InvitationsService', () => {
       };
 
       // Mock para encontrar la invitación
-      jest.spyOn(service, 'findOne').mockResolvedValueOnce({
-        id: mockInvitation.id,
-        email: mockInvitation.email,
-        name: mockInvitation.name,
-        role: mockInvitation.role,
-        companyId: mockInvitation.company_id,
-        status: mockInvitation.status,
-        createdBy: mockInvitation.created_by,
-        token: mockInvitation.token,
-        expiresAt: mockInvitation.expires_at,
-        createdAt: mockInvitation.created_at,
-        updatedAt: mockInvitation.updated_at,
-      } as InvitationDto);
+      jest.spyOn(service, 'findOne').mockImplementation(async () => {
+        return {
+          id: mockInvitation.id,
+          email: mockInvitation.email,
+          name: mockInvitation.name,
+          role: mockInvitation.role,
+          companyId: mockInvitation.company_id,
+          status: InvitationStatus.PENDING,
+          createdBy: mockInvitation.created_by,
+          token: mockInvitation.token,
+          expiresAt: mockInvitation.expires_at,
+          createdAt: mockInvitation.created_at,
+          updatedAt: mockInvitation.updated_at,
+        } as InvitationDto;
+      });
 
-      // Mock para actualizar la invitación
-      mockSupabaseClient.single.mockResolvedValueOnce({
+      // Mock para EmailService
+      mockEmailService.sendInvitationEmail.mockResolvedValue({
+        success: true,
+        data: { id: 'email-1' }
+      });
+
+      // Mock de Supabase update
+      mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
+      mockSupabaseClient.update.mockReturnValue(mockSupabaseClient);
+      mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
+      mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
+      mockSupabaseClient.single.mockResolvedValue({
         data: mockUpdatedInvitation,
         error: null,
       });
@@ -674,17 +686,65 @@ describe('InvitationsService', () => {
 
     it('should throw BadRequestException if invitation is not pending', async () => {
       // Arrange
-      // Mock para encontrar la invitación
-      jest.spyOn(service, 'findOne').mockResolvedValueOnce({
-        id: 'invitation-1',
-        status: InvitationStatus.ACCEPTED,
-        // ...resto de propiedades
-      } as InvitationDto);
+      // Mock para encontrar la invitación con estado ACCEPTED
+      jest.spyOn(service, 'findOne').mockImplementation(async () => {
+        return {
+          id: 'invitation-1',
+          status: InvitationStatus.ACCEPTED,
+          // Añadir otras propiedades necesarias para el DTO
+          email: 'test@example.com',
+          name: 'Test User',
+          role: UserRole.OPERATOR,
+          companyId: 'company-1',
+          createdBy: 'admin-1',
+          token: 'test-token',
+          expiresAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as InvitationDto;
+      });
 
       // Act & Assert
       await expect(service.regenerateToken('invitation-1')).rejects.toThrow(BadRequestException);
       expect(service.findOne).toHaveBeenCalledWith('invitation-1');
       expect(mockSupabaseClient.update).not.toHaveBeenCalled();
+    });
+
+    it('should throw InternalServerErrorException if database update fails', async () => {
+      // Arrange
+      // Mock para encontrar la invitación en estado PENDING
+      jest.spyOn(service, 'findOne').mockImplementation(async () => {
+        return {
+          id: 'invitation-1',
+          status: InvitationStatus.PENDING,
+          // Añadir otras propiedades necesarias para el DTO
+          email: 'test@example.com',
+          name: 'Test User',
+          role: UserRole.OPERATOR,
+          companyId: 'company-1',
+          createdBy: 'admin-1',
+          token: 'test-token',
+          expiresAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as InvitationDto;
+      });
+
+      // Mock para simular un error en la actualización
+      mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
+      mockSupabaseClient.update.mockReturnValue(mockSupabaseClient);
+      mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
+      mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
+      mockSupabaseClient.single.mockResolvedValue({
+        data: null,
+        error: { message: 'Database error', code: 'PGRST301' },
+      });
+
+      // Act & Assert
+      await expect(service.regenerateToken('invitation-1')).rejects.toThrow(InternalServerErrorException);
+      expect(service.findOne).toHaveBeenCalledWith('invitation-1');
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('invitation');
+      expect(mockSupabaseClient.update).toHaveBeenCalled();
     });
   });
 }); 
