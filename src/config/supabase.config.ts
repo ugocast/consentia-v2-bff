@@ -1,43 +1,61 @@
-import { createClient } from '@supabase/supabase-js';
-import { appConfig } from './app.config';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 
-// Cargar variables de entorno manualmente
+// Cargar variables de entorno
 dotenv.config();
 
-interface SupabaseOptions {
+interface CreateClientOptions {
   useServiceKey?: boolean;
 }
 
 /**
- * Crea un cliente de Supabase con las credenciales configuradas
+ * Crea y devuelve un cliente de Supabase configurado
+ * @param options Opciones de configuración del cliente
+ * @returns Cliente Supabase configurado
  */
-export const createSupabaseClient = (options: SupabaseOptions = {}) => {
-  const { useServiceKey = false } = options;
-
-  // Intentar obtener las variables directamente del process.env
-  const supabaseUrl = process.env.SUPABASE_URL || appConfig.supabase.url;
-  const supabaseKey = useServiceKey
-    ? process.env.SUPABASE_SERVICE_KEY || appConfig.supabase.serviceKey
-    : process.env.SUPABASE_KEY || appConfig.supabase.anonKey;
-
-  console.log('Debug - supabaseUrl:', supabaseUrl);
-  console.log('Debug - supabaseKey exists:', !!supabaseKey);
-
-  if (!supabaseUrl || !supabaseKey) {
-    console.error('Variables de entorno faltantes:');
-    console.error('SUPABASE_URL:', process.env.SUPABASE_URL);
-    console.error(
-      'SUPABASE_KEY:',
-      process.env.SUPABASE_KEY ? 'Definido' : 'No definido',
-    );
-    console.error(
-      'SUPABASE_SERVICE_KEY:',
-      process.env.SUPABASE_SERVICE_KEY ? 'Definido' : 'No definido',
-    );
-    console.error('appConfig.supabase:', JSON.stringify(appConfig.supabase));
-    throw new Error('Faltan las variables de entorno de Supabase');
+export function createSupabaseClient(options: CreateClientOptions = {}): SupabaseClient {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  
+  if (!supabaseUrl) {
+    throw new Error('SUPABASE_URL no está definida en las variables de entorno');
   }
+  
+  let supabaseKey;
+  
+  if (options.useServiceKey) {
+    // Usar service key para operaciones administrativas
+    supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+    
+    if (!supabaseKey) {
+      throw new Error('SUPABASE_SERVICE_KEY no está definida en las variables de entorno');
+    }
+  } else {
+    // Usar anon key para operaciones normales
+    supabaseKey = process.env.SUPABASE_KEY;
+    
+    if (!supabaseKey) {
+      throw new Error('SUPABASE_KEY no está definida en las variables de entorno');
+    }
+  }
+  
+  return createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
 
-  return createClient(supabaseUrl, supabaseKey);
-};
+/**
+ * Devuelve el secreto JWT para verificación de tokens
+ * @returns String con el secreto JWT
+ */
+export function getSupabaseJwtSecret(): string {
+  const secret = process.env.SUPABASE_JWT_SECRET;
+  
+  if (!secret) {
+    throw new Error('SUPABASE_JWT_SECRET no está definida en las variables de entorno');
+  }
+  
+  return secret;
+}

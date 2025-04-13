@@ -21,7 +21,6 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { UserRole } from '../users/enums/user-role.enum';
 import { AuthService } from '../auth/auth.service';
 import { CompanyUsersService } from '../company-users/company-users.service';
-import { RegisterDto } from '../auth/dto/auth.dto';
 import { CreateCompanyUserDto } from '../company-users/dto/create-company-user.dto';
 import { CompanyUserRole } from '../company-users/dto/company-user-role.enum';
 import { EmailService } from '../common/services/email/email.service';
@@ -424,16 +423,39 @@ export class InvitationsService {
           });
         }
         
-        // Registrar el usuario en Supabase Auth
-        const registerDto: RegisterDto = {
-          email: invitation.email,
-          name: acceptInvitationDto.name || invitation.name,
-          password: acceptInvitationDto.password
-        };
-        
         try {
-          const registerResult = await this.authService.register(registerDto);
-          userId = registerResult.user.id;
+          // Registrar el usuario directamente con Supabase Auth
+          const { data: authData, error: authError } = await this.supabase.auth.admin.createUser({
+            email: invitation.email,
+            password: acceptInvitationDto.password,
+            email_confirm: true, // Marcar el email como confirmado directamente
+            user_metadata: {
+              name: acceptInvitationDto.name || invitation.name,
+              onboarding_status: 'REGISTERED'
+            }
+          });
+          
+          if (authError || !authData.user) {
+            throw new Error(authError?.message || 'Error al crear usuario en Supabase Auth');
+          }
+          
+          userId = authData.user.id;
+          
+          // Sincronizar los datos del usuario con el BFF
+          if (userId) {
+            try {
+              await this.authService.syncUserData(userId, {
+                name: acceptInvitationDto.name || invitation.name,
+                onboardingStatus: 'EMAIL_VERIFIED' // Ya que la invitación valida el email
+              });
+            } catch (syncError) {
+              this.logger.error(`Error al sincronizar datos del usuario: ${syncError.message}`, {
+                userId,
+                error: syncError,
+              });
+              // No bloqueamos el flujo por un error en la sincronización
+            }
+          }
           
           this.logger.log(`Usuario creado con ID: ${userId} para invitación: ${invitation.id}`);
         } catch (error) {

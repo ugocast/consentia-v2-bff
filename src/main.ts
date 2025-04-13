@@ -11,17 +11,33 @@ import * as dotenv from 'dotenv';
 // Cargar variables de entorno manualmente
 dotenv.config();
 
-// Verificar las variables de entorno de Supabase
-console.log('SUPABASE_URL:', process.env.SUPABASE_URL);
-console.log(
-  'SUPABASE_KEY:',
-  process.env.SUPABASE_KEY ? 'Definido' : 'No definido',
-);
-console.log(
-  'SUPABASE_SERVICE_KEY:',
-  process.env.SUPABASE_SERVICE_KEY ? 'Definido' : 'No definido',
-);
-console.log('appConfig.supabase:', appConfig.supabase);
+// Verificar las variables de entorno de Supabase en modo desarrollo
+if (process.env.NODE_ENV !== 'production') {
+  console.log('Verificando variables de entorno esenciales:');
+  console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
+  console.log('PORT:', process.env.PORT || '3001');
+  console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
+  
+  // Variables de Supabase
+  console.log('SUPABASE_URL:', process.env.SUPABASE_URL);
+  console.log(
+    'SUPABASE_KEY:',
+    process.env.SUPABASE_KEY ? 'Definido' : 'No definido',
+  );
+  console.log(
+    'SUPABASE_SERVICE_KEY:',
+    process.env.SUPABASE_SERVICE_KEY ? 'Definido' : 'No definido',
+  );
+  console.log(
+    'SUPABASE_JWT_SECRET:',
+    process.env.SUPABASE_JWT_SECRET ? 'Definido' : 'No definido',
+  );
+  
+  // Advertencia si faltan variables críticas
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY || !process.env.SUPABASE_SERVICE_KEY || !process.env.SUPABASE_JWT_SECRET) {
+    console.warn('⚠️ ADVERTENCIA: Faltan variables de entorno esenciales para Supabase. Verifica tu archivo .env');
+  }
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

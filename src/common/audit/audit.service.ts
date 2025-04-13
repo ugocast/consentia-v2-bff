@@ -21,6 +21,11 @@ export enum AuditAction {
   WITHDRAW_CONSENT = 'withdraw_consent',
   EXPORT_CONSENT = 'export_consent',
   IMPORT_CONSENT = 'import_consent',
+  
+  // Nuevas acciones de consentimiento
+  CREATE_CONSENT_REQUEST = 'create_consent_request',
+  VIEW_CONSENT_REQUEST = 'view_consent_request',
+  RESPOND_TO_CONSENT = 'respond_to_consent',
 
   // Acciones de operaciones masivas
   CREATE_BULK_OPERATION = 'create_bulk_operation',
@@ -57,6 +62,8 @@ export enum AuditAction {
   DELETE_POLICY = 'delete_policy',
   PUBLISH_POLICY = 'publish_policy',
   ARCHIVE_POLICY = 'archive_policy',
+  UPDATE_POLICY_STATUS = 'update_policy_status',
+  SET_ACTIVE_POLICY = 'set_active_policy',
 
   // Acciones de tipo de datos
   CREATE_DATA_TYPE = 'create_data_type',
@@ -177,9 +184,13 @@ export class AuditService {
     try {
       const { error } = await this.supabase.from('audit_log').insert({
         action: entry.action,
+        resource_type: entry.resourceType,
+        resource_id: entry.resourceId,
+        user_id: entry.userId,
         company_user_id: entry.companyUserId,
         data_subject_id: entry.dataSubjectId,
         ip_address: entry.ipAddress || '',
+        user_agent: entry.userAgent || '',
         action_at: new Date().toISOString(),
         details: entry.details || entry.metadata || {}
       });

@@ -1,0 +1,1 @@
+// Este archivo se elimina ya que los DTOs se definen ahora en standard-response.dto.ts 

@@ -1,11 +1,11 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AuditService, AuditAction, ResourceType } from './audit.service';
-import { JwtGuard } from '../../auth/jwt/jwt.guard';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('audit')
 @Controller('audit')
-@UseGuards(JwtGuard)
+@UseGuards(JwtAuthGuard)
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 

@@ -1,36 +1,40 @@
-import {
-  IsBoolean,
-  IsNotEmpty,
-  IsArray,
-  IsOptional,
-  IsUUID,
-} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 /**
- * DTO para responder a solicitudes de consentimiento
+ * Tipos de respuesta para una solicitud de consentimiento
+ */
+export enum ConsentResponse {
+  GRANTED = 'GRANTED',
+  REJECTED = 'REJECTED'
+}
+
+/**
+ * DTO para responder a una solicitud de consentimiento
  */
 export class RespondConsentRequestDto {
   /**
-   * Indica si se acepta o rechaza el consentimiento
-   * @example true
+   * Respuesta a la solicitud: GRANTED (otorgado) o REJECTED (rechazado)
+   * @example "GRANTED"
    */
-  @IsBoolean()
-  @IsNotEmpty()
-  accepted: boolean;
+  @ApiProperty({
+    description: 'Respuesta a la solicitud: GRANTED (otorgado) o REJECTED (rechazado)',
+    example: 'GRANTED',
+    enum: ConsentResponse
+  })
+  @IsEnum(ConsentResponse, { message: 'La respuesta debe ser GRANTED o REJECTED' })
+  @IsNotEmpty({ message: 'La respuesta es requerida' })
+  response: ConsentResponse;
 
   /**
-   * IDs de los tipos de datos aceptados (solo si accepted es true)
-   * @example ["123e4567-e89b-12d3-a456-426614174000", "223e4567-e89b-12d3-a456-426614174000"]
+   * Motivo de la decisión (opcional)
+   * @example "Acepto recibir comunicaciones promocionales"
    */
-  @IsArray()
-  @IsUUID(4, { each: true })
+  @ApiPropertyOptional({
+    description: 'Motivo de la decisión (opcional)',
+    example: 'Acepto recibir comunicaciones promocionales'
+  })
+  @IsString({ message: 'El motivo debe ser una cadena de texto' })
   @IsOptional()
-  acceptedDataTypeIds?: string[];
-
-  /**
-   * Metadatos adicionales para la respuesta
-   * @example { "ip_address": "192.168.1.1", "user_agent": "Mozilla/5.0..." }
-   */
-  @IsOptional()
-  metadata?: Record<string, any>;
+  reason?: string;
 }

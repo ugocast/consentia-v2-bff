@@ -1,14 +1,14 @@
 import { Controller, Get, Post, Delete, Param, Body, UseGuards, Req, Query, UnauthorizedException } from '@nestjs/common';
 import { ApiKeysService } from './api-keys.service';
 import { ApiKeyDto, CreateApiKeyDto } from './dto';
-import { JwtGuard } from '../../auth/jwt/jwt.guard';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { RequestWithCompanyContext } from '../interfaces/company-context.interface';
 
 @ApiTags('api-keys')
 @ApiBearerAuth()
 @Controller('api-keys')
-@UseGuards(JwtGuard)
+@UseGuards(JwtAuthGuard)
 export class ApiKeysController {
   constructor(private readonly apiKeysService: ApiKeysService) {}
 

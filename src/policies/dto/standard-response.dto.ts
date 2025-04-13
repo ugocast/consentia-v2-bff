@@ -23,7 +23,7 @@ export class PolicyResponseDto {
  */
 export class PolicyCreateResponseDto {
   @ApiProperty({
-    description: 'Mensaje de confirmación',
+    description: 'Mensaje de éxito',
     example: 'Política legal creada exitosamente',
   })
   message: string;
@@ -52,20 +52,20 @@ export class PolicyCreateResponseDto {
  */
 export class PolicyVersionResponseDto {
   @ApiProperty({
-    description: 'Mensaje de confirmación',
+    description: 'Mensaje de éxito',
     example: 'Nueva versión de política creada exitosamente',
   })
   message: string;
 
   @ApiProperty({
-    description: 'ID de la nueva versión de la política',
+    description: 'ID de la nueva versión de política',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   id: string;
 
   @ApiProperty({
-    description: 'ID de la versión anterior',
-    example: '098f6bcd-4621-3373-8ade-4e832627b4f6',
+    description: 'ID de la versión anterior de la política',
+    example: '123e4567-e89b-12d3-a456-426614174001',
   })
   previousVersionId: string;
 
@@ -81,7 +81,7 @@ export class PolicyVersionResponseDto {
  */
 export class PolicyStatusResponseDto {
   @ApiProperty({
-    description: 'Mensaje de confirmación',
+    description: 'Mensaje de éxito',
     example: 'Estado de política actualizado correctamente',
   })
   message: string;
@@ -112,7 +112,7 @@ export class PolicyStatusResponseDto {
  */
 export class PolicyDeleteResponseDto {
   @ApiProperty({
-    description: 'Mensaje de confirmación',
+    description: 'Mensaje de éxito',
     example: 'Política eliminada correctamente',
   })
   message: string;
@@ -122,4 +122,34 @@ export class PolicyDeleteResponseDto {
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   id: string;
+}
+
+/**
+ * DTO para respuesta estándar de establecer política activa para empresa
+ */
+export class PolicySetActiveResponseDto {
+  @ApiProperty({
+    description: 'Mensaje de éxito',
+    example: 'Política establecida como activa exitosamente',
+  })
+  message: string;
+
+  @ApiProperty({
+    description: 'ID de la política establecida como activa',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  policyId: string;
+
+  @ApiProperty({
+    description: 'ID de la empresa',
+    example: '123e4567-e89b-12d3-a456-426614174001',
+  })
+  companyId: string;
+
+  @ApiProperty({
+    description: 'ID de la política activa anterior (si existía)',
+    example: '123e4567-e89b-12d3-a456-426614174002',
+    nullable: true,
+  })
+  previousActivePolicyId: string | null;
 } 

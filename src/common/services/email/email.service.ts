@@ -207,7 +207,7 @@ export class EmailService {
         <p>O copia y pega el siguiente enlace en tu navegador:</p>
         <p>${resetLink}</p>
         <p>Este enlace expirará en ${expirationMinutes} minutos.</p>
-        <p>Si no solicitaste este restablecimiento, puedes ignorar este correo. Tu cuenta sigue segura.</p>
+        <p>Si no solicitaste este restablecimiento de contraseña, puedes ignorar este correo.</p>
         <p>Saludos,<br>El equipo de Consentia</p>
       </div>
     `;
@@ -222,7 +222,7 @@ export class EmailService {
       
       Este enlace expirará en ${expirationMinutes} minutos.
       
-      Si no solicitaste este restablecimiento, puedes ignorar este correo. Tu cuenta sigue segura.
+      Si no solicitaste este restablecimiento de contraseña, puedes ignorar este correo.
       
       Saludos,
       El equipo de Consentia
@@ -231,6 +231,154 @@ export class EmailService {
     return this.sendEmail({
       to: email,
       subject: `Restablecimiento de contraseña - Consentia`,
+      html,
+      text,
+    });
+  }
+
+  /**
+   * Send a consent request email
+   */
+  async sendConsentRequestEmail(params: {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    companyName: string;
+    policyTitle: string;
+    purpose: string;
+    consentLink: string;
+    expirationDate: Date;
+  }) {
+    const { email, firstName, lastName, companyName, policyTitle, purpose, consentLink, expirationDate } = params;
+
+    const name = firstName ? (lastName ? `${firstName} ${lastName}` : firstName) : 'Estimado/a usuario/a';
+
+    const formattedExpirationDate = expirationDate.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">Solicitud de Consentimiento</h2>
+        <p>Hola ${name},</p>
+        <p><strong>${companyName}</strong> solicita tu consentimiento para el siguiente propósito:</p>
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 15px 0;">
+          <p style="margin: 0; font-style: italic;">${purpose}</p>
+        </div>
+        <p>Esta solicitud está basada en la política: <strong>${policyTitle}</strong>.</p>
+        <p>Por favor, revisa y responde a esta solicitud haciendo clic en el siguiente botón:</p>
+        <p style="text-align: center; margin: 25px 0;">
+          <a href="${consentLink}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+            Revisar Solicitud
+          </a>
+        </p>
+        <p>O copia y pega el siguiente enlace en tu navegador:</p>
+        <p>${consentLink}</p>
+        <p>Esta solicitud estará disponible hasta el ${formattedExpirationDate}.</p>
+        <p>Al acceder al enlace, podrás revisar todos los detalles y decidir si otorgar o rechazar el consentimiento.</p>
+        <p>Si tienes alguna pregunta, puedes contactar a ${companyName} respondiendo a este correo.</p>
+        <p>Saludos,<br>${companyName} a través de Consentia</p>
+      </div>
+    `;
+
+    const text = `
+      Solicitud de Consentimiento
+      
+      Hola ${name},
+      
+      ${companyName} solicita tu consentimiento para el siguiente propósito:
+      
+      "${purpose}"
+      
+      Esta solicitud está basada en la política: ${policyTitle}.
+      
+      Por favor, revisa y responde a esta solicitud visitando el siguiente enlace:
+      ${consentLink}
+      
+      Esta solicitud estará disponible hasta el ${formattedExpirationDate}.
+      
+      Al acceder al enlace, podrás revisar todos los detalles y decidir si otorgar o rechazar el consentimiento.
+      
+      Si tienes alguna pregunta, puedes contactar a ${companyName} respondiendo a este correo.
+      
+      Saludos,
+      ${companyName} a través de Consentia
+    `;
+
+    return this.sendEmail({
+      to: email,
+      subject: `Solicitud de Consentimiento - ${companyName}`,
+      html,
+      text,
+    });
+  }
+
+  /**
+   * Send a portal access email to data subjects
+   */
+  async sendPortalAccessEmail(params: {
+    email: string;
+    name: string;
+    portalLink: string;
+    expirationHours: number;
+    companyName?: string;
+  }) {
+    const { email, name, portalLink, expirationHours, companyName } = params;
+    const company = companyName ? ` de ${companyName}` : '';
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">Acceso al Portal de Datos Personales</h2>
+        <p>Hola ${name},</p>
+        <p>Has solicitado acceso al portal de gestión de datos personales${company}. Con este portal podrás:</p>
+        <ul>
+          <li>Ver todos tus consentimientos otorgados</li>
+          <li>Revocar consentimientos</li>
+          <li>Solicitar la eliminación de tus datos</li>
+          <li>Acceder a tus datos personales</li>
+        </ul>
+        <p>Por favor, haz clic en el siguiente botón para acceder al portal:</p>
+        <p style="text-align: center; margin: 25px 0;">
+          <a href="${portalLink}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+            Acceder al Portal
+          </a>
+        </p>
+        <p>O copia y pega el siguiente enlace en tu navegador:</p>
+        <p>${portalLink}</p>
+        <p>Este enlace expirará en ${expirationHours} horas por razones de seguridad.</p>
+        <p>Si no solicitaste este acceso, puedes ignorar este correo.</p>
+        <p>Saludos,<br>El equipo de Consentia</p>
+      </div>
+    `;
+
+    const text = `
+      Acceso al Portal de Datos Personales
+      
+      Hola ${name},
+      
+      Has solicitado acceso al portal de gestión de datos personales${company}. Con este portal podrás:
+      
+      - Ver todos tus consentimientos otorgados
+      - Revocar consentimientos
+      - Solicitar la eliminación de tus datos
+      - Acceder a tus datos personales
+      
+      Por favor, visita el siguiente enlace para acceder al portal:
+      ${portalLink}
+      
+      Este enlace expirará en ${expirationHours} horas por razones de seguridad.
+      
+      Si no solicitaste este acceso, puedes ignorar este correo.
+      
+      Saludos,
+      El equipo de Consentia
+    `;
+
+    return this.sendEmail({
+      to: email,
+      subject: `Acceso al Portal de Datos Personales${company} - Consentia`,
       html,
       text,
     });

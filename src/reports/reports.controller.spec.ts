@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ReportsController } from './reports.controller';
 import { ReportsService } from './reports.service';
-import { JwtGuard } from '../auth/jwt/jwt.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Request } from 'express';
 import {
   ConsentReportQueryDto,
@@ -126,7 +126,7 @@ describe('ReportsController', () => {
         },
       ],
     })
-      .overrideGuard(JwtGuard)
+      .overrideGuard(JwtAuthGuard)
       .useValue(mockJwtAuthGuard)
       .compile();
 

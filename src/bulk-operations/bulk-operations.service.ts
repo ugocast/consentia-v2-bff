@@ -297,7 +297,7 @@ export class BulkOperationsService {
    */
   private async processCreateConsents(operation: BulkOperationDto, userId: string): Promise<void> {
     for (const item of operation.items) {
-      await this.consentsService.createRequest(item, userId);
+      await this.consentsService.createRequest(item, item.companyId || operation.company_id, userId);
     }
   }
 

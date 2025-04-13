@@ -2,20 +2,84 @@ import { ApiProperty } from '@nestjs/swagger';
 import { ConsentStatus } from './consent-status.enum';
 
 /**
+ * DTO para respuestas estándar de operaciones con consentimientos (respuesta distinta a ConsentResponseDto)
+ */
+export class StandardResponseDto {
+  /**
+   * Indica si la operación fue exitosa
+   * @example true
+   */
+  @ApiProperty({
+    description: 'Indica si la operación fue exitosa',
+    example: true
+  })
+  success: boolean;
+
+  /**
+   * Mensaje descriptivo de la operación
+   * @example "Operación completada exitosamente"
+   */
+  @ApiProperty({
+    description: 'Mensaje descriptivo de la operación',
+    example: 'Operación completada exitosamente'
+  })
+  message: string;
+
+  /**
+   * ID del recurso afectado (opcional)
+   * @example "123e4567-e89b-12d3-a456-426614174000"
+   */
+  @ApiProperty({
+    description: 'ID del recurso afectado',
+    example: '123e4567-e89b-12d3-a456-426614174000'
+  })
+  resourceId?: string;
+}
+
+/**
  * DTO para respuestas generales de consentimientos
  */
 export class ConsentResponseDto {
+  /**
+   * Indica si la operación fue exitosa
+   * @example true
+   */
+  @ApiProperty({
+    description: 'Indica si la operación fue exitosa',
+    example: true
+  })
+  success: boolean;
+
+  /**
+   * Mensaje descriptivo de la operación
+   * @example "Operación completada exitosamente"
+   */
   @ApiProperty({
     description: 'Mensaje de confirmación',
     example: 'Operación completada exitosamente',
   })
   message: string;
 
+  /**
+   * ID del consentimiento
+   * @example "123e4567-e89b-12d3-a456-426614174000"
+   */
   @ApiProperty({
     description: 'ID del consentimiento',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  id: string;
+  consentId: string;
+
+  /**
+   * Estado del consentimiento
+   * @example "GRANTED"
+   */
+  @ApiProperty({
+    description: 'Estado del consentimiento',
+    example: 'GRANTED',
+    enum: ConsentStatus
+  })
+  status: ConsentStatus;
 }
 
 /**

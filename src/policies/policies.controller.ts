@@ -11,6 +11,8 @@ import {
   HttpCode,
   HttpStatus,
   Req,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { PoliciesService } from './policies.service';
 import { 
@@ -22,7 +24,8 @@ import {
   PolicyCreateResponseDto,
   PolicyVersionResponseDto,
   PolicyStatusResponseDto,
-  PolicyDeleteResponseDto
+  PolicyDeleteResponseDto,
+  PolicySetActiveResponseDto
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -55,6 +58,32 @@ export class PoliciesController {
   @ApiQuery({ name: 'companyId', required: false, description: 'ID de la compañía para filtrar' })
   async findAll(@Query('companyId') companyId?: string): Promise<PolicyDto[]> {
     return this.policiesService.findAll(companyId);
+  }
+
+  /**
+   * Obtiene la política activa de la empresa
+   * @param req Solicitud con contexto de compañía
+   * @returns Política activa o null si no hay ninguna
+   */
+  @Get('active')
+  @ApiOperation({ summary: 'Obtiene la política legal activa de la empresa' })
+  @ApiResponse({ status: 200, description: 'Política activa obtenida', type: PolicyDto })
+  @ApiResponse({ status: 404, description: 'No se encontró política activa' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  async getActivePolicy(@Req() req: RequestWithCompanyContext): Promise<PolicyDto | null> {
+    const companyId = req.companyContext?.companyId;
+    
+    if (!companyId) {
+      throw new BadRequestException('No se encontró el contexto de empresa');
+    }
+    
+    const activePolicy = await this.policiesService.getActivePolicy(companyId);
+    if (!activePolicy) {
+      throw new NotFoundException('No hay política activa para esta empresa');
+    }
+    
+    return activePolicy;
   }
 
   /**
@@ -210,6 +239,45 @@ export class PoliciesController {
     return {
       message: 'Política eliminada correctamente',
       id
+    };
+  }
+
+  /**
+   * Establece una política como activa para una empresa
+   * @param id ID de la política
+   * @param req Solicitud con contexto de compañía
+   * @param userId ID del usuario autenticado
+   * @returns Respuesta con información de la actualización
+   */
+  @Put(':id/set-active')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Establece una política como activa para una empresa' })
+  @ApiResponse({ status: 200, description: 'Política establecida como activa exitosamente', type: PolicySetActiveResponseDto })
+  @ApiResponse({ status: 400, description: 'Datos inválidos o política no puede ser establecida como activa' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Prohibido' })
+  @ApiResponse({ status: 404, description: 'Política o empresa no encontrada' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  @ApiParam({ name: 'id', description: 'ID de la política' })
+  async setActiveForCompany(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: RequestWithCompanyContext,
+    @CurrentUser('id') userId: string,
+  ): Promise<PolicySetActiveResponseDto> {
+    const companyId = req.companyContext?.companyId;
+    
+    if (!companyId) {
+      throw new BadRequestException('No se encontró el contexto de empresa');
+    }
+    
+    const result = await this.policiesService.setActiveForCompany(id, companyId, userId);
+    
+    return {
+      message: 'Política establecida como activa exitosamente',
+      policyId: result.policyId,
+      companyId: result.companyId,
+      previousActivePolicyId: result.previousActivePolicyId
     };
   }
 }

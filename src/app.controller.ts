@@ -2,6 +2,7 @@ import { Controller, Get, Redirect } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AppService } from './app.service';
 import { appConfig } from './config/app.config';
+import { Public } from './common/decorators/public.decorator';
 
 @ApiTags('app')
 @Controller()
@@ -40,5 +41,33 @@ export class AppController {
   @Redirect()
   getDocs() {
     return { url: `/${appConfig.server.docsPath}` };
+  }
+
+  /**
+   * Endpoint de health-check
+   * 
+   * Esta ruta es pública (no requiere autenticación) y proporciona información
+   * básica sobre el estado del sistema.
+   */
+  @ApiOperation({ summary: 'Verificar estado del sistema' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Servicio operativo',
+    schema: {
+      properties: {
+        status: { type: 'string', example: 'ok' },
+        timestamp: { type: 'string', example: '2023-08-01T12:00:00Z' },
+        version: { type: 'string', example: '1.0.0' }
+      }
+    }
+  })
+  @Public()
+  @Get('health-check')
+  healthCheck() {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      version: process.env.npm_package_version || '1.0.0'
+    };
   }
 }

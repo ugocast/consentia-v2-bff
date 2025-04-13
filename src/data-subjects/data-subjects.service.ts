@@ -21,13 +21,19 @@ import { ConsentStatus } from '../consents/dto/consent-status.enum';
 import { handleNestedProperty, safeArrayMap, safeMetadata, safeValue } from '../common/utils/data-transforms.util';
 import { ConsentEntity, DataSubjectEntity, DataTypeEntity } from '../common/interfaces/supabase-responses.interface';
 import { ErrorCode } from '../common/interfaces/error-types.interface';
+import { EmailService } from '../common/services/email/email.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class DataSubjectsService {
   private readonly logger = new Logger(DataSubjectsService.name);
   private supabase = createSupabaseClient({ useServiceKey: true });
 
-  constructor(private readonly auditService: AuditService) {}
+  constructor(
+    private readonly auditService: AuditService,
+    private readonly emailService: EmailService,
+    private readonly configService: ConfigService
+  ) {}
 
   /**
    * Crea un nuevo titular de datos
@@ -156,6 +162,371 @@ export class DataSubjectsService {
       throw new InternalServerErrorException({
         code: ErrorCode.UNKNOWN_ERROR,
         message: 'Error inesperado al buscar titulares de datos',
+        originalError: error
+      });
+    }
+  }
+
+  /**
+   * Encuentra todos los titulares de datos con filtros avanzados
+   * @param filters - Objeto con filtros avanzados
+   * @returns Lista de titulares de datos que cumplen con los criterios
+   */
+  async findAllAdvanced(filters: {
+    companyId?: string;
+    status?: DataSubjectStatus;
+    email?: string;
+    name?: string;
+    verified?: boolean;
+    createdAfter?: string;
+    createdBefore?: string;
+    externalId?: string;
+    limit?: number;
+    offset?: number;
+    sortBy?: string;
+    sortDirection?: 'asc' | 'desc';
+  }): Promise<{ data: DataSubjectDto[]; total: number }> {
+    try {
+      const {
+        companyId,
+        status,
+        email,
+        name,
+        verified,
+        createdAfter,
+        createdBefore,
+        externalId,
+        limit = 10,
+        offset = 0,
+        sortBy = 'created_at',
+        sortDirection = 'desc',
+      } = filters;
+
+      // Preparar la consulta con contador
+      const countQuery = this.supabase
+        .from('data_subject')
+        .select('*', { count: 'exact', head: true });
+
+      // Consulta principal
+      let query = this.supabase
+        .from('data_subject')
+        .select('*');
+
+      // Aplicar filtros
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+        countQuery.eq('company_id', companyId);
+      }
+
+      if (status) {
+        query = query.eq('status', status);
+        countQuery.eq('status', status);
+      }
+
+      if (email) {
+        query = query.ilike('email', `%${email}%`);
+        countQuery.ilike('email', `%${email}%`);
+      }
+
+      if (name) {
+        query = query.or(`full_name.ilike.%${name}%`);
+        countQuery.or(`full_name.ilike.%${name}%`);
+      }
+
+      if (verified !== undefined) {
+        query = query.eq('verified', verified);
+        countQuery.eq('verified', verified);
+      }
+
+      if (createdAfter) {
+        query = query.gte('created_at', createdAfter);
+        countQuery.gte('created_at', createdAfter);
+      }
+
+      if (createdBefore) {
+        query = query.lte('created_at', createdBefore);
+        countQuery.lte('created_at', createdBefore);
+      }
+
+      if (externalId) {
+        query = query.eq('external_id', externalId);
+        countQuery.eq('external_id', externalId);
+      }
+
+      // Aplicar paginación y ordenamiento
+      query = query
+        .order(sortBy, { ascending: sortDirection === 'asc' })
+        .range(offset, offset + limit - 1);
+
+      // Obtener resultados y total
+      const [{ data, error }, countResult] = await Promise.all([
+        query,
+        countQuery,
+      ]);
+
+      const { count, error: countError } = countResult || { count: 0, error: null };
+
+      if (error || countError) {
+        this.logger.error(`Error al buscar titulares de datos: ${error?.message || countError?.message}`, error || countError);
+        throw new InternalServerErrorException({
+          code: ErrorCode.DATABASE_ERROR,
+          message: 'Error al buscar titulares de datos',
+          originalError: error || countError
+        });
+      }
+
+      return {
+        data: safeArrayMap(data as DataSubjectEntity[], item => this.transformToDto(item)),
+        total: count ?? 0,
+      };
+    } catch (error) {
+      if (error instanceof InternalServerErrorException) {
+        throw error;
+      }
+      this.logger.error(`Error al buscar titulares de datos: ${error.message}`, error);
+      throw new InternalServerErrorException({
+        code: ErrorCode.UNKNOWN_ERROR,
+        message: 'Error inesperado al buscar titulares de datos',
+        originalError: error
+      });
+    }
+  }
+
+  /**
+   * Busca titulares de datos por nombre
+   * @param name - Nombre o parte del nombre a buscar
+   * @param companyId - ID de la compañía (opcional)
+   * @returns Lista de titulares que coinciden con el nombre
+   */
+  async findByName(name: string, companyId?: string): Promise<DataSubjectDto[]> {
+    try {
+      if (!name || name.trim() === '') {
+        throw new BadRequestException({
+          code: ErrorCode.INVALID_INPUT,
+          message: 'El nombre de búsqueda es requerido'
+        });
+      }
+
+      let query = this.supabase
+        .from('data_subject')
+        .select('*')
+        .ilike('full_name', `%${name}%`);
+
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (error) {
+        this.logger.error(`Error al buscar titulares por nombre: ${error.message}`, error);
+        throw new InternalServerErrorException({
+          code: ErrorCode.DATABASE_ERROR,
+          message: 'Error al buscar titulares por nombre',
+          originalError: error
+        });
+      }
+
+      return safeArrayMap(data as DataSubjectEntity[], item => this.transformToDto(item));
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof InternalServerErrorException) {
+        throw error;
+      }
+      this.logger.error(`Error al buscar titulares por nombre: ${error.message}`, error);
+      throw new InternalServerErrorException({
+        code: ErrorCode.UNKNOWN_ERROR,
+        message: 'Error inesperado al buscar titulares por nombre',
+        originalError: error
+      });
+    }
+  }
+
+  /**
+   * Busca titulares de datos por criterios múltiples (búsqueda general)
+   * @param term - Término de búsqueda general (email, nombre, teléfono, ID externo)
+   * @param companyId - ID de la compañía (opcional)
+   * @returns Lista de titulares que coinciden con el término
+   */
+  async search(term: string, companyId?: string): Promise<DataSubjectDto[]> {
+    try {
+      if (!term || term.trim() === '') {
+        throw new BadRequestException({
+          code: ErrorCode.INVALID_INPUT,
+          message: 'El término de búsqueda es requerido'
+        });
+      }
+
+      // Construir una consulta que busque en múltiples campos
+      let query = this.supabase
+        .from('data_subject')
+        .select('*')
+        .or(`email.ilike.%${term}%,full_name.ilike.%${term}%,external_id.eq.${term},phone.ilike.%${term}%,id.eq.${term}`);
+
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (error) {
+        this.logger.error(`Error en búsqueda general: ${error.message}`, error);
+        throw new InternalServerErrorException({
+          code: ErrorCode.DATABASE_ERROR,
+          message: 'Error en búsqueda general de titulares',
+          originalError: error
+        });
+      }
+
+      return safeArrayMap(data as DataSubjectEntity[], item => this.transformToDto(item));
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof InternalServerErrorException) {
+        throw error;
+      }
+      this.logger.error(`Error en búsqueda general: ${error.message}`, error);
+      throw new InternalServerErrorException({
+        code: ErrorCode.UNKNOWN_ERROR,
+        message: 'Error inesperado en búsqueda general',
+        originalError: error
+      });
+    }
+  }
+  
+  /**
+   * Cuenta titulares de datos según criterios
+   * @param companyId - ID de la compañía (opcional)
+   * @param status - Estado para filtrar (opcional)
+   * @returns Número total de titulares que cumplen los criterios
+   */
+  async count(companyId?: string, status?: DataSubjectStatus): Promise<number> {
+    try {
+      let query = this.supabase
+        .from('data_subject')
+        .select('*', { count: 'exact', head: true });
+
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      if (status) {
+        query = query.eq('status', status);
+      }
+
+      const countResult = await query;
+      // Usar operador de coalescencia para manejar count posiblemente nulo
+      const count = countResult?.count ?? 0;
+
+      if (countResult.error) {
+        this.logger.error(`Error al contar titulares: ${countResult.error.message}`, countResult.error);
+        throw new InternalServerErrorException({
+          code: ErrorCode.DATABASE_ERROR,
+          message: 'Error al contar titulares de datos',
+          originalError: countResult.error
+        });
+      }
+
+      return count;
+    } catch (error) {
+      if (error instanceof InternalServerErrorException) {
+        throw error;
+      }
+      this.logger.error(`Error al contar titulares: ${error.message}`, error);
+      throw new InternalServerErrorException({
+        code: ErrorCode.UNKNOWN_ERROR,
+        message: 'Error inesperado al contar titulares',
+        originalError: error
+      });
+    }
+  }
+
+  /**
+   * Actualiza el estado de verificación de un titular de datos
+   * @param id - ID del titular de datos
+   * @param verified - Nuevo estado de verificación
+   * @param userId - ID del usuario que realiza la actualización
+   * @returns Titular de datos actualizado
+   */
+  async updateVerificationStatus(id: string, verified: boolean, userId: string): Promise<DataSubjectDto> {
+    try {
+      // Verificar que el titular existe
+      const dataSubject = await this.findOne(id);
+      
+      // Actualizar solo el estado de verificación
+      const { data, error } = await this.supabase
+        .from('data_subject')
+        .update({
+          verified,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        this.logger.error(`Error al actualizar estado de verificación: ${error.message}`, error);
+        throw new InternalServerErrorException({
+          code: ErrorCode.DATABASE_ERROR,
+          message: 'Error al actualizar estado de verificación',
+          originalError: error
+        });
+      }
+
+      // Registrar en auditoría
+      await this.auditService.log({
+        action: AuditAction.UPDATE,
+        resourceType: ResourceType.USER,
+        resourceId: id,
+        userId,
+        metadata: {
+          field: 'verified',
+          newValue: verified,
+          previousValue: dataSubject.verified,
+        },
+      });
+
+      return this.transformToDto(data as DataSubjectEntity);
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof InternalServerErrorException) {
+        throw error;
+      }
+      this.logger.error(`Error al actualizar estado de verificación: ${error.message}`, error);
+      throw new InternalServerErrorException({
+        code: ErrorCode.UNKNOWN_ERROR,
+        message: 'Error inesperado al actualizar estado de verificación',
+        originalError: error
+      });
+    }
+  }
+
+  /**
+   * Valida la existencia de un titular de datos
+   * @param id - ID del titular de datos a validar
+   * @returns true si el titular existe, false en caso contrario
+   */
+  async exists(id: string): Promise<boolean> {
+    try {
+      const { count, error } = await this.supabase
+        .from('data_subject')
+        .select('*', { count: 'exact', head: true })
+        .eq('id', id);
+
+      if (error) {
+        this.logger.error(`Error al verificar existencia: ${error.message}`, error);
+        throw new InternalServerErrorException({
+          code: ErrorCode.DATABASE_ERROR,
+          message: 'Error al verificar existencia del titular',
+          originalError: error
+        });
+      }
+
+      return !!count && count > 0;
+    } catch (error) {
+      if (error instanceof InternalServerErrorException) {
+        throw error;
+      }
+      this.logger.error(`Error al verificar existencia: ${error.message}`, error);
+      throw new InternalServerErrorException({
+        code: ErrorCode.UNKNOWN_ERROR,
+        message: 'Error inesperado al verificar existencia',
         originalError: error
       });
     }
@@ -387,7 +758,7 @@ export class DataSubjectsService {
    */
   async requestPortalAccess(portalAccessRequestDto: PortalAccessRequestDto): Promise<{ message: string }> {
     try {
-      const { email } = portalAccessRequestDto;
+      const { email, frontendPortalUrl } = portalAccessRequestDto;
       
       // Buscar el titular de datos por email
       const dataSubject = await this.findByEmail(email);
@@ -416,8 +787,39 @@ export class DataSubjectsService {
         });
       }
       
-      // TODO: Enviar correo con enlace que contenga el token
-      // Aquí se implementaría la lógica de envío de correo
+      // Obtener datos de la empresa si el titular está asociado a una
+      let companyName: string | undefined = undefined;
+      if (dataSubject.companyId) {
+        const { data: company, error: companyError } = await this.supabase
+          .from('company')
+          .select('name')
+          .eq('id', dataSubject.companyId)
+          .single();
+        
+        if (!companyError && company) {
+          companyName = company.name;
+        }
+      }
+      
+      // Construir el enlace para el portal
+      const baseUrl = frontendPortalUrl || this.configService.get<string>('FRONTEND_URL') || 'https://app.consentia.io';
+      const portalLink = `${baseUrl}/portal/verify?token=${token}`;
+      
+      // Enviar correo electrónico con el enlace
+      const emailResult = await this.emailService.sendPortalAccessEmail({
+        email: dataSubject.email,
+        name: dataSubject.fullName || 'Estimado usuario',
+        portalLink,
+        expirationHours: 24,
+        companyName,
+      });
+      
+      if (!emailResult.success) {
+        this.logger.warn(`Error al enviar correo de acceso al portal: ${emailResult.error?.message}`, emailResult.error);
+        // No lanzamos error para no interrumpir el flujo principal
+      } else {
+        this.logger.log(`Correo de acceso al portal enviado correctamente a ${dataSubject.email}`);
+      }
       
       return { message: 'Se ha enviado un enlace de acceso a su correo electrónico' };
     } catch (error) {
@@ -512,13 +914,27 @@ export class DataSubjectsService {
         .select(`
           id,
           status,
+          reason,
           created_at,
           updated_at,
-          expiry_date,
-          legal_policy:legal_policy_id (id, title),
+          expires_at,
+          metadata,
+          legal_policy:legal_policy_id (
+            id, 
+            title, 
+            version,
+            valid_from,
+            status,
+            content
+          ),
+          consent_request (
+            purpose,
+            channel,
+            metadata
+          ),
           consent_data_type (
             data_type_id,
-            data_type:data_type_id (id, name, code)
+            data_type:data_type_id (id, name, code, description)
           )
         `)
         .eq('data_subject_id', dataSubjectId)
@@ -536,17 +952,52 @@ export class DataSubjectsService {
       // Transformar los datos a DTOs
       return safeArrayMap(data as ConsentEntity[], consent => {
         const now = new Date();
-        const expiryDate = consent.expiry_date ? new Date(consent.expiry_date) : null;
+        const expiryDate = consent.expires_at ? new Date(consent.expires_at) : null;
         
         // Procesamos legal_policy de forma segura
         const legalPolicy = handleNestedProperty(consent.legal_policy);
+        const consentRequest = handleNestedProperty(consent.consent_request);
+        
+        // Obtener la fecha correcta de la acción
+        let actionDate = consent.updated_at;
+        const metadata = safeMetadata(consent.metadata);
+        
+        // Si el consentimiento fue revocado, usar la fecha de revocación
+        if (consent.status === ConsentStatus.REVOKED && metadata.revoked_at) {
+          actionDate = metadata.revoked_at;
+        }
+        
+        // Extraer el propósito del consentimiento
+        const purpose = consentRequest?.purpose || 
+          (consentRequest?.metadata?.purpose) || 
+          metadata?.purpose || 
+          '';
+          
+        // Obtener detalles más específicos según el estado
+        let statusDetails = '';
+        if (consent.status === ConsentStatus.DENIED || consent.status === ConsentStatus.REVOKED) {
+          statusDetails = consent.reason || '';
+        }
+
+        // Verificar si el consentimiento ha expirado aunque no esté marcado como tal
+        let status = consent.status as ConsentStatus;
+        let isExpired = expiryDate ? now > expiryDate : false;
+        
+        // Si está expirado pero no está marcado como tal, lo consideramos expirado para UI
+        if (isExpired && status !== ConsentStatus.EXPIRED) {
+          status = ConsentStatus.EXPIRED;
+        }
         
         return {
           id: consent.id,
           dataSubjectId,
           legalPolicyId: safeValue(legalPolicy, 'id', ''),
           policyTitle: safeValue(legalPolicy, 'title', ''),
-          status: consent.status as ConsentStatus,
+          policyVersion: safeValue(legalPolicy, 'version', ''),
+          policyDate: safeValue(legalPolicy, 'valid_from', ''),
+          purpose,
+          status,
+          statusDetails,
           dataTypes: safeArrayMap(consent.consent_data_type, cdt => {
             const dataType = handleNestedProperty(cdt.data_type);
             return {
@@ -555,17 +1006,25 @@ export class DataSubjectsService {
               code: safeValue(dataType, 'code', '')
             };
           }),
-          actionDate: consent.updated_at || new Date().toISOString(),
-          expiryDate: consent.expiry_date || undefined,
-          isExpired: expiryDate ? now > expiryDate : false
+          actionDate: actionDate || consent.created_at || new Date().toISOString(),
+          expiryDate: consent.expires_at || undefined,
+          isExpired,
+          channel: consentRequest?.channel || metadata?.channel || ''
         };
       });
     } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
       if (error instanceof InternalServerErrorException) {
         throw error;
       }
       this.logger.error(`Error al obtener historial de consentimientos: ${error.message}`, error);
-      throw error;
+      throw new InternalServerErrorException({
+        code: ErrorCode.UNKNOWN_ERROR,
+        message: 'Error inesperado al obtener historial de consentimientos',
+        originalError: error
+      });
     }
   }
 

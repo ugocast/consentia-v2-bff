@@ -36,11 +36,17 @@ const mockSupabaseClient = {
   in: jest.fn(() => mockSupabaseClient),
   single: jest.fn(),
   maybeSingle: jest.fn(),
+  auth: {
+    admin: {
+      createUser: jest.fn(),
+    },
+  },
 };
 
 // Mock del servicio de autenticación
 const mockAuthService = {
   register: jest.fn(),
+  syncUserData: jest.fn(),
 };
 
 // Mock del servicio de usuarios de compañía
@@ -294,12 +300,12 @@ describe('InvitationsService', () => {
   });
 
   describe('accept', () => {
-    it('should accept an invitation and create a new user', async () => {
+    it('should accept an invitation for a new user', async () => {
       // Arrange
       const acceptDto: AcceptInvitationDto = {
         token: 'valid-token',
+        name: 'New User',
         password: 'password123',
-        name: 'Updated Name',
       };
 
       const mockInvitation = {
@@ -329,19 +335,31 @@ describe('InvitationsService', () => {
         error: null,
       });
 
-      // Mock para el registro de usuario
-      mockAuthService.register.mockResolvedValueOnce({
-        user: {
+      // Mock para el registro de usuario con Supabase Auth
+      jest.spyOn(mockSupabaseClient.auth.admin, 'createUser').mockResolvedValueOnce({
+        data: {
+          user: {
+            id: 'new-user-id',
+            email: mockInvitation.email,
+            user_metadata: {
+              name: acceptDto.name,
+              onboarding_status: 'REGISTERED'
+            },
+          }
+        },
+        error: null
+      });
+
+      // Mock para sincronizar datos de usuario
+      mockAuthService.syncUserData.mockResolvedValueOnce({
+        success: true,
+        message: 'Datos sincronizados correctamente',
+        userData: {
           id: 'new-user-id',
           email: mockInvitation.email,
-          user_metadata: {
-            name: acceptDto.name,
-          },
-        },
-        session: {
-          access_token: 'access-token',
-          refresh_token: 'refresh-token',
-        },
+          name: acceptDto.name,
+          onboardingStatus: 'EMAIL_VERIFIED'
+        }
       });
 
       // Mock para validateUserBelongsToCompanyByAuthId
@@ -366,10 +384,18 @@ describe('InvitationsService', () => {
       // Assert
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('invitation');
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('token', 'valid-token');
-      expect(mockAuthService.register).toHaveBeenCalledWith({
+      expect(mockSupabaseClient.auth.admin.createUser).toHaveBeenCalledWith({
         email: mockInvitation.email,
-        name: acceptDto.name,
         password: acceptDto.password,
+        email_confirm: true,
+        user_metadata: {
+          name: acceptDto.name,
+          onboarding_status: 'REGISTERED'
+        }
+      });
+      expect(mockAuthService.syncUserData).toHaveBeenCalledWith('new-user-id', {
+        name: acceptDto.name,
+        onboardingStatus: 'EMAIL_VERIFIED'
       });
       expect(mockCompanyUsersService.validateUserBelongsToCompanyByAuthId).toHaveBeenCalledWith(
         'new-user-id',

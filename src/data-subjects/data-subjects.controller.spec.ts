@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSubjectsController } from './data-subjects.controller';
 import { DataSubjectsService } from './data-subjects.service';
-import { JwtGuard } from '../auth/jwt/jwt.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { 
   CreateDataSubjectDto, 
   DataSubjectDto, 
@@ -56,7 +56,7 @@ describe('DataSubjectsController', () => {
         },
       ],
     })
-      .overrideGuard(JwtGuard)
+      .overrideGuard(JwtAuthGuard)
       .useValue(mockJwtGuard)
       .compile();
 

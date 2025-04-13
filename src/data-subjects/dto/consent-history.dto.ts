@@ -29,10 +29,34 @@ export class ConsentHistoryDto {
   policyTitle: string;
 
   /**
+   * Versión de la política
+   * @example "1.2"
+   */
+  policyVersion?: string;
+
+  /**
+   * Fecha de entrada en vigor de la política
+   * @example "2023-01-01T00:00:00.000Z"
+   */
+  policyDate?: string;
+
+  /**
+   * Propósito del consentimiento
+   * @example "Envío de comunicaciones promocionales"
+   */
+  purpose?: string;
+
+  /**
    * Estado del consentimiento
    * @example "granted"
    */
   status: ConsentStatus;
+
+  /**
+   * Detalles adicionales sobre el estado (ej. razón de rechazo o revocación)
+   * @example "Ya no deseo recibir comunicaciones promocionales"
+   */
+  statusDetails?: string;
 
   /**
    * Tipos de datos incluidos en el consentimiento
@@ -61,4 +85,10 @@ export class ConsentHistoryDto {
    * @example false
    */
   isExpired: boolean;
+
+  /**
+   * Canal utilizado para solicitar el consentimiento
+   * @example "EMAIL"
+   */
+  channel?: string;
 } 

@@ -159,25 +159,63 @@ export function setupSupabaseError(error: any) {
 // Función para resetear los mocks
 export function resetSupabaseMocks() {
   Object.values(mockSupabaseClient).forEach((value) => {
-    if (value && typeof value === 'object' && value.mockReset) {
+    if (value && typeof value === 'object' && value !== mockSupabaseClient.auth && typeof value.mockReset === 'function') {
       value.mockReset();
     }
   });
 
-  // Resetear auth y sus métodos
-  Object.values(mockSupabaseClient.auth).forEach((method) => {
-    if (method && typeof method === 'object' && method.mockReset) {
-      method.mockReset();
-    }
-  });
+  // Resetear métodos de auth que no son admin
+  if (mockSupabaseClient.auth.signUp && typeof mockSupabaseClient.auth.signUp.mockReset === 'function') {
+    mockSupabaseClient.auth.signUp.mockReset();
+  }
+  if (mockSupabaseClient.auth.signInWithPassword && typeof mockSupabaseClient.auth.signInWithPassword.mockReset === 'function') {
+    mockSupabaseClient.auth.signInWithPassword.mockReset();
+  }
+  if (mockSupabaseClient.auth.signOut && typeof mockSupabaseClient.auth.signOut.mockReset === 'function') {
+    mockSupabaseClient.auth.signOut.mockReset();
+  }
+  if (mockSupabaseClient.auth.getUser && typeof mockSupabaseClient.auth.getUser.mockReset === 'function') {
+    mockSupabaseClient.auth.getUser.mockReset();
+  }
+  if (mockSupabaseClient.auth.setSession && typeof mockSupabaseClient.auth.setSession.mockReset === 'function') {
+    mockSupabaseClient.auth.setSession.mockReset();
+  }
+  if (mockSupabaseClient.auth.resetPasswordForEmail && typeof mockSupabaseClient.auth.resetPasswordForEmail.mockReset === 'function') {
+    mockSupabaseClient.auth.resetPasswordForEmail.mockReset();
+  }
+  if (mockSupabaseClient.auth.updateUser && typeof mockSupabaseClient.auth.updateUser.mockReset === 'function') {
+    mockSupabaseClient.auth.updateUser.mockReset();
+  }
+  if (mockSupabaseClient.auth.refreshSession && typeof mockSupabaseClient.auth.refreshSession.mockReset === 'function') {
+    mockSupabaseClient.auth.refreshSession.mockReset();
+  }
+  if (mockSupabaseClient.auth.verifyOtp && typeof mockSupabaseClient.auth.verifyOtp.mockReset === 'function') {
+    mockSupabaseClient.auth.verifyOtp.mockReset();
+  }
 
-  // Resetear auth.admin y sus métodos
+  // Resetear métodos individuales de auth.admin
   if (mockSupabaseClient.auth.admin) {
-    Object.values(mockSupabaseClient.auth.admin).forEach((method) => {
-      if (method && typeof method === 'function' && method.mockReset) {
-        method.mockReset();
-      }
-    });
+    if (mockSupabaseClient.auth.admin.getUserById && typeof mockSupabaseClient.auth.admin.getUserById.mockReset === 'function') {
+      mockSupabaseClient.auth.admin.getUserById.mockReset();
+    }
+    if (mockSupabaseClient.auth.admin.updateUserById && typeof mockSupabaseClient.auth.admin.updateUserById.mockReset === 'function') {
+      mockSupabaseClient.auth.admin.updateUserById.mockReset();
+    }
+    if (mockSupabaseClient.auth.admin.deleteUser && typeof mockSupabaseClient.auth.admin.deleteUser.mockReset === 'function') {
+      mockSupabaseClient.auth.admin.deleteUser.mockReset();
+    }
+    if (mockSupabaseClient.auth.admin.listUsers && typeof mockSupabaseClient.auth.admin.listUsers.mockReset === 'function') {
+      mockSupabaseClient.auth.admin.listUsers.mockReset();
+    }
+    if (mockSupabaseClient.auth.admin.createUser && typeof mockSupabaseClient.auth.admin.createUser.mockReset === 'function') {
+      mockSupabaseClient.auth.admin.createUser.mockReset();
+    }
+    if (mockSupabaseClient.auth.admin.inviteUserByEmail && typeof mockSupabaseClient.auth.admin.inviteUserByEmail.mockReset === 'function') {
+      mockSupabaseClient.auth.admin.inviteUserByEmail.mockReset();
+    }
+    if (mockSupabaseClient.auth.admin.generateLink && typeof mockSupabaseClient.auth.admin.generateLink.mockReset === 'function') {
+      mockSupabaseClient.auth.admin.generateLink.mockReset();
+    }
   }
 
   // Restablecer comportamiento por defecto

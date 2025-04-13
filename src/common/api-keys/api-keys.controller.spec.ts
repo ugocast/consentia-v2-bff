@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ApiKeysController } from './api-keys.controller';
 import { ApiKeysService } from './api-keys.service';
-import { JwtGuard } from '../../auth/jwt/jwt.guard';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { ApiKeyStatus, ApiKeyDto, CreateApiKeyDto } from './dto';
 import { Request } from 'express';
 
@@ -35,7 +35,7 @@ describe('ApiKeysController', () => {
         },
       ],
     })
-      .overrideGuard(JwtGuard)
+      .overrideGuard(JwtAuthGuard)
       .useValue(mockJwtGuard)
       .compile();
 

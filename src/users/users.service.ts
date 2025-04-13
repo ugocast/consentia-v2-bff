@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { createSupabaseClient } from '../config/supabase.config';
-import { UpdateUserDto, UserDto, CreateUserCompanyDto, UserCompanyResponseDto } from './dto';
+import { UpdateUserDto, UserDto, CreateUserCompanyDto } from './dto';
 import { SelectActiveCompanyDto, ActiveCompanyResponseDto } from './dto/select-active-company.dto';
 import { ErrorCode } from '../common/interfaces/error-types.interface';
 import { AuditService } from '../common/audit/audit.service';
@@ -8,6 +8,18 @@ import { AuditAction, ResourceType } from '../common/audit/audit.types';
 import { CompaniesService } from '../companies/companies.service';
 import { CreateCompanyDto } from '../companies/dto';
 import { CompanyUserRole, CompanyUserStatus } from '../company-users/dto';
+import { SubscriptionPlan } from '../companies/dto';
+
+// Define el tipo faltante que coincida con el DTO en user-company-response.dto.ts
+interface UserCompanyResponseDto {
+  success: boolean;
+  message: string;
+  companyId: string;
+  companyName: string;
+  subscriptionPlan: SubscriptionPlan;
+  companyUserId: string;
+  role: string;
+}
 
 @Injectable()
 export class UsersService {
@@ -266,7 +278,7 @@ export class UsersService {
       // 3. Crear la empresa
       const company = await this.companiesService.create(createCompanyDto, userId);
       
-      // 4. Crear el vínculo company_user con rol ADMINISTRATOR
+      // 4. Crear el vínculo company_user con rol ADMIN
       const now = new Date().toISOString();
       
       const { data: companyUserData, error: companyUserError } = await this.supabase
@@ -276,7 +288,7 @@ export class UsersService {
           auth_id: userId,
           full_name: user.name,
           email: user.email,
-          role: CompanyUserRole.ADMINISTRATOR,
+          role: CompanyUserRole.ADMIN,
           status: CompanyUserStatus.ACTIVE,
           created_at: now,
           updated_at: now,
@@ -321,8 +333,8 @@ export class UsersService {
       
       // 7. Registrar en auditoría
       await this.auditService.log({
-        action: AuditAction.CREATE_COMPANY,
-        resourceType: ResourceType.COMPANY,
+        action: 'create_company' as any,
+        resourceType: 'company' as any,
         resourceId: company.id,
         userId,
         metadata: {
@@ -338,9 +350,9 @@ export class UsersService {
         message: 'Empresa creada correctamente',
         companyId: company.id,
         companyName: company.name,
-        subscriptionPlan: company.subscription_plan,
+        subscriptionPlan: company.subscription_plan as SubscriptionPlan,
         companyUserId: companyUserData.id,
-        role: CompanyUserRole.ADMINISTRATOR,
+        role: CompanyUserRole.ADMIN,
       };
     } catch (error) {
       if (error instanceof BadRequestException || error instanceof InternalServerErrorException) {

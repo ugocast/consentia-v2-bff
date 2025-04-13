@@ -30,6 +30,26 @@ export interface LegalPolicyEntity extends SupabaseEntity {
   content?: string;
   version?: string;
   is_active?: boolean;
+  status?: string;
+  valid_from?: string;
+  valid_to?: string;
+  company_id?: string;
+  previous_version_id?: string;
+}
+
+/**
+ * Interfaz para una solicitud de consentimiento
+ */
+export interface ConsentRequestEntity extends SupabaseEntity {
+  data_subject_id: string;
+  legal_policy_id: string;
+  company_id?: string;
+  status: string;
+  token?: string;
+  purpose?: string;
+  channel?: string;
+  metadata?: Record<string, any>;
+  expires_at?: string;
 }
 
 /**
@@ -47,12 +67,16 @@ export interface ConsentDataTypeEntity extends SupabaseEntity {
 export interface ConsentEntity extends SupabaseEntity {
   data_subject_id: string;
   legal_policy_id: string;
+  consent_request_id?: string;
   status: string;
+  reason?: string;
   is_mandatory?: boolean;
   expiry_date?: string;
+  expires_at?: string;
   metadata?: Record<string, any>;
   consent_data_type?: ConsentDataTypeEntity[];
   legal_policy?: LegalPolicyEntity | LegalPolicyEntity[];
+  consent_request?: ConsentRequestEntity | ConsentRequestEntity[];
 }
 
 /**

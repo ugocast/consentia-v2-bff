@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditController } from './audit.controller';
 import { AuditService, AuditAction, ResourceType } from './audit.service';
-import { JwtGuard } from '../../auth/jwt/jwt.guard';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
-// Mock para JwtGuard
-const mockJwtGuard = { canActivate: jest.fn().mockReturnValue(true) };
+// Mock para JwtAuthGuard
+const mockJwtAuthGuard = { canActivate: jest.fn().mockReturnValue(true) };
 
 describe('AuditController', () => {
   let controller: AuditController;
@@ -25,8 +25,8 @@ describe('AuditController', () => {
         },
       ],
     })
-      .overrideGuard(JwtGuard)
-      .useValue(mockJwtGuard)
+      .overrideGuard(JwtAuthGuard)
+      .useValue(mockJwtAuthGuard)
       .compile();
 
     controller = module.get<AuditController>(AuditController);

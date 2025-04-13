@@ -28,10 +28,10 @@ import {
   DataAccessResponseDto,
   DataRectificationRequestDto,
   PortalAccessResponseDto,
-  PortalVerificationResponseDto,
   ArcoRequestResponseDto,
   DeleteResponseDto
 } from './dto';
+import { PortalVerificationResponseDto } from './dto/portal-verification.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ParseUUIDPipe } from '../common/pipes/parse-uuid.pipe';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -200,39 +200,50 @@ export class DataSubjectsController {
    */
 
   /**
-   * Solicita acceso al portal de autogestión
-   * @param portalAccessRequestDto Datos para solicitar acceso
+   * Solicita acceso al portal de autogestión (endpoint público)
+   * @param portalAccessRequestDto Datos de la solicitud
    * @returns Mensaje de confirmación
    */
   @Post('portal/request-access')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Solicita acceso al portal de autogestión' })
-  @ApiResponse({ status: 200, description: 'Solicitud procesada', type: PortalAccessResponseDto })
-  @ApiResponse({ status: 400, description: 'Datos inválidos' })
-  @ApiResponse({ status: 404, description: 'Email no encontrado' })
   @SkipCompanyContext()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Solicita acceso al portal de autogestión para un titular de datos',
+    description: 'Envía un correo electrónico con un enlace de acceso al portal de autogestión'
+  })
+  @ApiResponse({ status: 200, description: 'Solicitud procesada', type: PortalAccessResponseDto })
+  @ApiResponse({ status: 404, description: 'Titular de datos no encontrado' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
   async requestPortalAccess(
     @Body() portalAccessRequestDto: PortalAccessRequestDto,
   ): Promise<PortalAccessResponseDto> {
-    return this.dataSubjectsService.requestPortalAccess(portalAccessRequestDto);
+    const result = await this.dataSubjectsService.requestPortalAccess(portalAccessRequestDto);
+    return { success: true, message: result.message };
   }
 
   /**
-   * Verifica token de acceso al portal
-   * @param portalVerificationDto Datos para verificar el token
+   * Verifica el token de acceso al portal y devuelve el ID del titular
+   * @param portalVerificationDto Datos para la verificación
    * @returns ID del titular de datos
    */
   @Post('portal/verify')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Verifica un token de acceso al portal' })
-  @ApiResponse({ status: 200, description: 'Token verificado', type: PortalVerificationResponseDto })
-  @ApiResponse({ status: 400, description: 'Datos inválidos' })
-  @ApiResponse({ status: 401, description: 'Token inválido o expirado' })
   @SkipCompanyContext()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Verifica el token de acceso al portal', 
+    description: 'Valida un token de acceso enviado por correo y devuelve el ID del titular para autenticar la sesión'
+  })
+  @ApiResponse({ status: 200, description: 'Token verificado', type: PortalVerificationResponseDto })
+  @ApiResponse({ status: 400, description: 'Token inválido' })
+  @ApiResponse({ status: 401, description: 'Token expirado o inválido' })
   async verifyPortalAccess(
     @Body() portalVerificationDto: PortalVerificationDto,
   ): Promise<PortalVerificationResponseDto> {
-    return this.dataSubjectsService.verifyPortalAccess(portalVerificationDto);
+    const result = await this.dataSubjectsService.verifyPortalAccess(portalVerificationDto);
+    return { 
+      success: true, 
+      dataSubjectId: result.dataSubjectId 
+    };
   }
 
   /**
@@ -274,15 +285,18 @@ export class DataSubjectsController {
    */
 
   /**
-   * Solicita la eliminación de datos personales
+   * Solicita eliminación de datos personales
    * @param dataSubjectId ID del titular de datos
    * @param dataDeletionRequestDto Datos para la solicitud de eliminación
    * @returns Mensaje de confirmación con ID de la solicitud
    */
   @Post('portal/:dataSubjectId/delete')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Solicita eliminación de datos personales' })
-  @ApiResponse({ status: 200, description: 'Solicitud procesada', type: ArcoRequestResponseDto })
+  @ApiOperation({ 
+    summary: 'Solicita eliminación de datos personales',
+    description: 'Permite a un titular de datos solicitar la eliminación parcial o completa de sus datos personales'
+  })
+  @ApiResponse({ status: 200, description: 'Solicitud procesada correctamente', type: ArcoRequestResponseDto })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 404, description: 'Titular no encontrado' })
   @SkipCompanyContext()
@@ -340,5 +354,158 @@ export class DataSubjectsController {
       dataSubjectId,
       dataRectificationRequestDto,
     );
+  }
+
+  /**
+   * Obtiene el historial de consentimientos del titular de datos autenticado
+   * @returns Historial de consentimientos del usuario actual
+   */
+  @Get('me/consents')
+  @ApiOperation({ summary: 'Obtiene historial de consentimientos del usuario autenticado' })
+  @ApiResponse({ status: 200, description: 'Historial obtenido', type: [ConsentHistoryDto] })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @SkipCompanyContext()
+  async getMyConsentHistory(
+    @CurrentUser('dataSubjectId') dataSubjectId: string,
+  ): Promise<ConsentHistoryDto[]> {
+    if (!dataSubjectId) {
+      throw new BadRequestException('Esta ruta solo está disponible para titulares de datos autenticados');
+    }
+    return this.dataSubjectsService.getConsentHistory(dataSubjectId);
+  }
+
+  /**
+   * Busca titulares de datos con criterios avanzados
+   * @param req Request with company context
+   * @returns Lista paginada de titulares de datos
+   */
+  @Get('search/advanced')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.AUDITOR)
+  @ApiOperation({ summary: 'Busca titulares de datos con filtros avanzados' })
+  @ApiResponse({ status: 200, description: 'Lista de titulares obtenida', type: DataSubjectDto, isArray: true })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Prohibido' })
+  async findAllAdvanced(
+    @Req() req: RequestWithCompanyContext,
+    @Query('companyId') companyId?: string,
+    @Query('status') status?: DataSubjectStatus,
+    @Query('email') email?: string,
+    @Query('name') name?: string,
+    @Query('verified') verified?: boolean,
+    @Query('createdAfter') createdAfter?: string,
+    @Query('createdBefore') createdBefore?: string,
+    @Query('externalId') externalId?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDirection') sortDirection?: 'asc' | 'desc',
+  ) {
+    // Si no se especifica companyId, usar el del contexto de empresa
+    if (!companyId && req.companyContext) {
+      companyId = req.companyContext.companyId;
+    }
+
+    return this.dataSubjectsService.findAllAdvanced({
+      companyId,
+      status,
+      email,
+      name,
+      verified,
+      createdAfter,
+      createdBefore,
+      externalId,
+      limit: limit ? Number(limit) : undefined,
+      offset: offset ? Number(offset) : undefined,
+      sortBy,
+      sortDirection,
+    });
+  }
+
+  /**
+   * Busca titulares de datos por nombre
+   * @param name Nombre o parte del nombre a buscar
+   * @param req Request with company context
+   * @param companyId ID de la compañía (opcional)
+   * @returns Lista de titulares de datos
+   */
+  @Get('search/by-name')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.AUDITOR)
+  @ApiOperation({ summary: 'Busca titulares de datos por nombre' })
+  @ApiResponse({ status: 200, description: 'Lista de titulares obtenida', type: DataSubjectDto, isArray: true })
+  @ApiResponse({ status: 400, description: 'Nombre no proporcionado' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Prohibido' })
+  async findByName(
+    @Query('name') name: string,
+    @Req() req: RequestWithCompanyContext,
+    @Query('companyId') companyId?: string,
+  ): Promise<DataSubjectDto[]> {
+    if (!name) {
+      throw new BadRequestException('El nombre de búsqueda es requerido');
+    }
+
+    // Si no se especifica companyId, usar el del contexto
+    if (!companyId && req.companyContext) {
+      companyId = req.companyContext.companyId;
+    }
+
+    return this.dataSubjectsService.findByName(name, companyId);
+  }
+
+  /**
+   * Busca titulares de datos por término general
+   * @param term Término de búsqueda (email, nombre, teléfono, ID)
+   * @param req Request with company context
+   * @param companyId ID de la compañía (opcional)
+   * @returns Lista de titulares de datos
+   */
+  @Get('search')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.AUDITOR)
+  @ApiOperation({ summary: 'Busca titulares de datos por término general' })
+  @ApiResponse({ status: 200, description: 'Lista de titulares obtenida', type: DataSubjectDto, isArray: true })
+  @ApiResponse({ status: 400, description: 'Término no proporcionado' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Prohibido' })
+  async search(
+    @Query('term') term: string,
+    @Req() req: RequestWithCompanyContext,
+    @Query('companyId') companyId?: string,
+  ): Promise<DataSubjectDto[]> {
+    if (!term) {
+      throw new BadRequestException('El término de búsqueda es requerido');
+    }
+
+    // Si no se especifica companyId, usar el del contexto
+    if (!companyId && req.companyContext) {
+      companyId = req.companyContext.companyId;
+    }
+
+    return this.dataSubjectsService.search(term, companyId);
+  }
+
+  /**
+   * Actualiza el estado de verificación de un titular de datos
+   * @param id ID del titular de datos
+   * @param verified Nuevo estado de verificación
+   * @param userId ID del usuario autenticado
+   * @returns Titular de datos actualizado
+   */
+  @Patch(':id/verification')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Actualiza el estado de verificación de un titular de datos' })
+  @ApiResponse({ status: 200, description: 'Estado de verificación actualizado', type: DataSubjectDto })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Prohibido' })
+  @ApiResponse({ status: 404, description: 'Titular no encontrado' })
+  async updateVerification(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('verified') verified: boolean,
+    @CurrentUser('id') userId: string,
+  ): Promise<DataSubjectDto> {
+    return this.dataSubjectsService.updateVerificationStatus(id, verified, userId);
   }
 }

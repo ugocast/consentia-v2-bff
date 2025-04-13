@@ -38,7 +38,31 @@ export class PoliciesService {
         throw new Error(`Error al obtener políticas: ${error.message}`);
       }
 
-      return data.map(policy => this.transformToCamelCase(policy));
+      // Si se proporciona un ID de empresa, obtener información de la política activa
+      let activePolicyId = null;
+      if (companyId) {
+        const { data: companyData, error: companyError } = await this.supabase
+          .from('company')
+          .select('active_policy_id')
+          .eq('id', companyId)
+          .single();
+
+        if (!companyError && companyData) {
+          activePolicyId = companyData.active_policy_id;
+        }
+      }
+
+      // Transformar y marcar las políticas activas
+      return data.map(policy => {
+        const policyDto = this.transformToCamelCase(policy);
+        if (activePolicyId && policyDto.id === activePolicyId) {
+          policyDto.metadata = {
+            ...policyDto.metadata,
+            isActive: true
+          };
+        }
+        return policyDto;
+      });
     } catch (error) {
       this.logger.error('Error al obtener políticas', error);
       throw error;
@@ -233,27 +257,28 @@ export class PoliciesService {
   }
 
   /**
-   * Elimina una política (soft delete)
+   * Cambia el estado de una política (soft delete) a DELETED
    * @param id - ID de la política
-   * @param userId - ID del usuario que elimina la política
+   * @param userId - ID del usuario que elimina
    * @throws NotFoundException si la política no existe
-   * @throws Error si hay un problema al eliminar la política
+   * @throws Error si hay un problema al eliminar
    */
   async remove(id: string, userId: string): Promise<void> {
     try {
-      const current = await this.findOne(id);
+      const policy = await this.findOne(id);
 
-      const { error: updateError } = await this.supabase
+      const { error } = await this.supabase
         .from('legal_policy')
-        .update({ valid_to: new Date().toISOString() })
+        .update({
+          status: PolicyStatus.DELETED,
+          updated_by: userId,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', id);
 
-      if (updateError) {
-        this.logger.error(
-          `Error al eliminar política: ${updateError.message}`,
-          updateError,
-        );
-        throw new Error(`Error al eliminar política: ${updateError.message}`);
+      if (error) {
+        this.logger.error(`Error al eliminar política: ${error.message}`, error);
+        throw new Error(`Error al eliminar política: ${error.message}`);
       }
 
       await this.auditService.log({
@@ -262,9 +287,8 @@ export class PoliciesService {
         resourceId: id,
         userId,
         metadata: {
-          policyId: id,
-          title: current.title,
-          companyId: current.companyId,
+          policyTitle: policy.title,
+          companyId: policy.companyId,
         },
       });
     } catch (error) {
@@ -348,10 +372,10 @@ export class PoliciesService {
    * Actualiza el estado de una política
    * @param id - ID de la política
    * @param status - Nuevo estado
-   * @param userId - ID del usuario que realiza el cambio
+   * @param userId - ID del usuario que actualiza el estado
    * @returns Política actualizada
    * @throws NotFoundException si la política no existe
-   * @throws BadRequestException si la transición de estado no es válida
+   * @throws BadRequestException si el estado es inválido o la transición no es permitida
    * @throws Error si hay un problema al actualizar el estado
    */
   async updateStatus(
@@ -360,25 +384,25 @@ export class PoliciesService {
     userId: string,
   ): Promise<PolicyDto> {
     try {
-      // Verificar que la política existe
       const policy = await this.findOne(id);
-      
-      // Si la política no tiene un estado, asumimos que está en borrador
-      const currentStatus = policy.status || PolicyStatus.DRAFT;
-      
-      // Verificar que la transición de estado es válida
-      if (!this.isValidStatusTransition(currentStatus, status)) {
-        this.logger.warn(`Transición de estado inválida: ${currentStatus} -> ${status}`);
-        throw new BadRequestException(`Transición de estado inválida: ${currentStatus} -> ${status}`);
+
+      if (!Object.values(PolicyStatus).includes(status)) {
+        throw new BadRequestException('Estado de política inválido');
       }
 
-      // Actualizar el estado
+      // Verificar si la transición de estado es válida
+      if (!this.isValidStatusTransition(policy.status || PolicyStatus.DRAFT, status)) {
+        throw new BadRequestException(
+          `Transición de estado no permitida: ${policy.status} -> ${status}`,
+        );
+      }
+
       const { data, error } = await this.supabase
         .from('legal_policy')
-        .update({ 
-          status: status,
+        .update({
+          status,
+          updated_by: userId,
           updated_at: new Date().toISOString(),
-          updated_by: userId
         })
         .eq('id', id)
         .select()
@@ -389,19 +413,19 @@ export class PoliciesService {
           `Error al actualizar estado de política: ${error.message}`,
           error,
         );
-        throw new Error(`Error al actualizar estado de política: ${error.message}`);
+        throw new Error(
+          `Error al actualizar estado de política: ${error.message}`,
+        );
       }
 
-      // Registrar el cambio en auditoría
       await this.auditService.log({
-        action: AuditAction.UPDATE_POLICY,  // Usamos UPDATE_POLICY en lugar de UPDATE_POLICY_STATUS
-        resourceType: ResourceType.POLICY_STATUS,
+        action: AuditAction.UPDATE_POLICY_STATUS,
+        resourceType: ResourceType.POLICY,
         resourceId: id,
         userId,
         metadata: {
-          previousStatus: currentStatus,
-          currentStatus: status,
-          title: policy.title
+          previousStatus: policy.status,
+          newStatus: status,
         },
       });
 
@@ -416,11 +440,102 @@ export class PoliciesService {
   }
 
   /**
-   * Verifica si una transición de estado es válida
-   * @param currentStatus - Estado actual
-   * @param newStatus - Nuevo estado
+   * Establece una política como activa para una empresa
+   * @param policyId - ID de la política a establecer como activa
+   * @param companyId - ID de la empresa
+   * @param userId - ID del usuario que realiza la acción
+   * @returns La política anterior y la nueva política activa
+   * @throws NotFoundException si la política o la empresa no existe
+   * @throws BadRequestException si la política no está en estado ACTIVE
+   * @throws Error si hay un problema al establecer la política activa
+   */
+  async setActiveForCompany(
+    policyId: string,
+    companyId: string,
+    userId: string,
+  ): Promise<{ previousActivePolicyId: string | null; policyId: string; companyId: string }> {
+    try {
+      // 1. Verificar que la política existe y está en estado ACTIVE
+      const policy = await this.findOne(policyId);
+      
+      if (policy.status !== PolicyStatus.ACTIVE) {
+        throw new BadRequestException(
+          'Solo se puede establecer como activa una política en estado ACTIVE',
+        );
+      }
+
+      if (policy.companyId !== companyId) {
+        throw new BadRequestException(
+          'La política no pertenece a la empresa especificada',
+        );
+      }
+
+      // 2. Obtener la política activa actual (si existe)
+      const { data: companyData, error: companyError } = await this.supabase
+        .from('company')
+        .select('active_policy_id')
+        .eq('id', companyId)
+        .single();
+
+      if (companyError) {
+        this.logger.error(
+          `Error al obtener información de la empresa: ${companyError.message}`,
+          companyError,
+        );
+        throw new NotFoundException('Empresa no encontrada');
+      }
+
+      const previousActivePolicyId = companyData.active_policy_id;
+
+      // 3. Actualizar la política activa de la empresa
+      const { error: updateError } = await this.supabase
+        .from('company')
+        .update({
+          active_policy_id: policyId,
+          updated_at: new Date().toISOString(),
+          updated_by: userId,
+        })
+        .eq('id', companyId);
+
+      if (updateError) {
+        this.logger.error(
+          `Error al establecer política activa: ${updateError.message}`,
+          updateError,
+        );
+        throw new Error(`Error al establecer política activa: ${updateError.message}`);
+      }
+
+      // 4. Registrar en el log de auditoría
+      await this.auditService.log({
+        action: AuditAction.SET_ACTIVE_POLICY,
+        resourceType: ResourceType.COMPANY,
+        resourceId: companyId,
+        userId,
+        metadata: {
+          policyId,
+          previousActivePolicyId,
+        },
+      });
+
+      return {
+        previousActivePolicyId,
+        policyId,
+        companyId,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error al establecer política activa: ${error.message}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Determina si una transición de estado es válida
+   * @param currentStatus - Estado actual de la política
+   * @param newStatus - Nuevo estado deseado
    * @returns true si la transición es válida, false en caso contrario
-   * @private
    */
   private isValidStatusTransition(currentStatus: PolicyStatus, newStatus: PolicyStatus): boolean {
     // Si los estados son iguales, no es una transición
@@ -463,5 +578,59 @@ export class PoliciesService {
       status: data.status,
       createdBy: data.created_by,
     };
+  }
+
+  /**
+   * Obtiene la política activa de una empresa
+   * @param companyId - ID de la empresa
+   * @returns Política activa o null si no hay ninguna activa
+   * @throws NotFoundException si la empresa no existe
+   * @throws Error si hay un problema al obtener la política
+   */
+  async getActivePolicy(companyId: string): Promise<PolicyDto | null> {
+    try {
+      // Obtener el ID de la política activa de la empresa
+      const { data: companyData, error: companyError } = await this.supabase
+        .from('company')
+        .select('active_policy_id')
+        .eq('id', companyId)
+        .single();
+
+      if (companyError) {
+        this.logger.error(
+          `Error al obtener información de la empresa: ${companyError.message}`,
+          companyError,
+        );
+        throw new NotFoundException('Empresa no encontrada');
+      }
+
+      // Si no hay política activa, retornar null
+      if (!companyData.active_policy_id) {
+        return null;
+      }
+
+      // Obtener los detalles de la política activa
+      try {
+        const policy = await this.findOne(companyData.active_policy_id);
+        
+        // Marcar como política activa en los metadatos
+        policy.metadata = {
+          ...policy.metadata,
+          isActive: true
+        };
+        
+        return policy;
+      } catch (error) {
+        // Si la política no existe o hay otro error, retornar null
+        this.logger.warn(`Política activa no encontrada: ${error.message}`);
+        return null;
+      }
+    } catch (error) {
+      this.logger.error(
+        `Error al obtener política activa: ${error.message}`,
+        error,
+      );
+      throw error;
+    }
   }
 }

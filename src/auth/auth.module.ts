@@ -1,40 +1,36 @@
-import { Module, forwardRef } from '@nestjs/common';
-import { PassportModule } from '@nestjs/passport';
-import { JwtModule } from '@nestjs/jwt';
+import { Global, Module, forwardRef } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { JwtStrategy } from './jwt/jwt.strategy';
-import { appConfig } from '../config/app.config';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { AuditModule } from '../common/audit/audit.module';
 import { UsersModule } from '../users/users.module';
-import { CommonModule } from '../common/common.module';
-import { PermissionsService } from './permissions/permissions.service';
-import { CompanyUsersModule } from '../company-users/company-users.module';
-import { EmailModule } from '../common/services/email/email.module';
-import { ConfigModule } from '@nestjs/config';
 
+@Global() // Esto hace que todos los proveedores de este módulo estén disponibles globalmente
 @Module({
   imports: [
-    PassportModule.register({ defaultStrategy: 'jwt' }),
-    JwtModule.register({
-      secret: appConfig.jwt.secret,
-      signOptions: { expiresIn: appConfig.jwt.expiresIn },
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('SUPABASE_JWT_SECRET'),
+        signOptions: { 
+          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '1h')
+        },
+      }),
+      inject: [ConfigService],
     }),
+    AuditModule,
     forwardRef(() => UsersModule),
-    forwardRef(() => CompanyUsersModule),
-    forwardRef(() => CommonModule),
-    EmailModule,
-    ConfigModule,
-  ],
-  providers: [
-    AuthService, 
-    JwtStrategy,
-    PermissionsService
   ],
   controllers: [AuthController],
+  providers: [
+    AuthService,
+    JwtAuthGuard
+  ],
   exports: [
-    AuthService, 
-    JwtModule,
-    PermissionsService
+    AuthService,
+    JwtAuthGuard
   ],
 })
 export class AuthModule {}
